@@ -5,12 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>参考アカウント管理 | ぬーまん × Venture Films</title>
 <!--
-  accounts.html  v1.3.0
+  accounts.html  v1.5.0
   UPDATE LOG:
+  v1.5.0 (2026-03-16) GitHubをデータ置き場にした共有同期機能を追加
+  v1.4.0 (2026-03-16) 画像圧縮機能追加・localStorage容量超過問題を修正
   v1.3.0 (2026-03-16) APIキーをlocalStorageに保存・AI自動読み取り復活
   v1.2.0 (2026-03-16) AI読み取りを一時無効化・手動入力方式に変更
   v1.1.0 (2026-03-16) 登録日表示・スクショ再アップで上書き更新機能追加
   v1.0.0 (2026-03-16) 初期リリース
+
+  GITHUB SYNC:
+  - データは nu-man1029/consul_tool の data.json に保存
+  - ぬーまん（書き込み権限あり）：GitHub Tokenを設定して使用
+  - 高野さん（読み取りのみ）：Tokenなしで閲覧可能
 -->
 <style>
 :root {
@@ -37,16 +44,22 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
 .hdr-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .back-a{font-size:12px;font-weight:600;color:var(--tx2);text-decoration:none;padding:6px 12px;border:1px solid var(--bd);border-radius:var(--rsm);background:var(--sub);white-space:nowrap}
 .back-a:hover{color:var(--org);border-color:var(--org-b)}
-.settings-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--bd);background:var(--sub);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:all .15s}
-.settings-btn:hover{border-color:var(--org-b);background:var(--org-l)}
+.icon-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--bd);background:var(--sub);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:all .15s}
+.icon-btn:hover{border-color:var(--org-b);background:var(--org-l)}
 .pbar{height:3px;background:var(--bd);overflow:hidden}
 .pbar-f{height:100%;background:var(--org);transition:width .5s}
 
-/* API KEY BANNER */
-.api-banner{margin:12px 16px 0;padding:12px 14px;background:var(--red-l);border:1px solid var(--red-b);border-radius:var(--rs);display:flex;align-items:center;justify-content:space-between;gap:10px}
-.api-banner-txt{font-size:12px;color:var(--red);font-weight:600;line-height:1.5}
-.api-banner-btn{font-size:12px;font-weight:700;padding:6px 12px;border-radius:var(--rsm);border:none;background:var(--red);color:#fff;cursor:pointer;white-space:nowrap;flex-shrink:0}
-.api-ok-banner{margin:12px 16px 0;padding:10px 14px;background:var(--grn-l);border:1px solid var(--grn-b);border-radius:var(--rs);display:flex;align-items:center;gap:8px;font-size:12px;color:var(--grn);font-weight:600}
+/* SYNC STATUS BAR */
+.sync-bar{padding:8px 16px;display:flex;align-items:center;gap:8px;font-size:12px;border-bottom:1px solid var(--bd);background:#fff}
+.sync-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sync-dot.ok{background:var(--grn)}
+.sync-dot.loading{background:var(--org);animation:blink 1s infinite}
+.sync-dot.err{background:var(--red)}
+.sync-dot.notoken{background:var(--tx3)}
+.sync-txt{flex:1;color:var(--tx2)}
+.sync-btn{font-size:11px;font-weight:700;padding:4px 10px;border-radius:var(--rsm);border:1px solid var(--org-b);background:var(--org-l);color:var(--org);cursor:pointer;white-space:nowrap;flex-shrink:0}
+.sync-btn:hover{background:var(--org-m)}
+.sync-time{font-size:10px;color:var(--tx3);white-space:nowrap}
 
 /* FILTER */
 .fbar{padding:10px 16px;overflow-x:auto;display:flex;gap:6px;scrollbar-width:none;background:#fff;border-bottom:1px solid var(--bd);position:sticky;top:83px;z-index:99}
@@ -74,7 +87,6 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
 .abody{padding:14px}
 .arow{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
 .aav{width:46px;height:46px;border-radius:50%;border:2px solid var(--bd);background:var(--sub);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;overflow:hidden}
-.aav img{width:100%;height:100%;object-fit:cover}
 .ainfo{flex:1;min-width:0}
 .aname{font-size:14px;font-weight:800;line-height:1.3}
 .aid{font-size:12px;color:var(--org);font-weight:600;margin-top:1px}
@@ -122,20 +134,21 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
 .msub{font-size:12px;color:var(--tx2);margin-top:3px;line-height:1.6}
 .mbody{padding:16px 20px 40px}
 
-/* SETTINGS MODAL */
-.settings-section{margin-bottom:20px}
-.settings-section-title{font-size:12px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bd)}
-.api-key-wrap{position:relative}
-.api-key-input{width:100%;font-size:13px;padding:10px 44px 10px 12px;border:1px solid var(--bd2);border-radius:var(--rsm);background:var(--inp);color:var(--tx);font-family:'Courier New',monospace;letter-spacing:.5px}
-.api-key-input:focus{outline:none;border-color:var(--org);background:#fff}
-.api-key-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;padding:4px;color:var(--tx2)}
-.api-status{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:var(--rsm);margin-top:8px;font-size:12px;font-weight:600}
-.api-status.set{background:var(--grn-l);color:var(--grn);border:1px solid var(--grn-b)}
-.api-status.unset{background:var(--red-l);color:var(--red);border:1px solid var(--red-b)}
-.api-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.api-status.set .api-status-dot{background:var(--grn)}
-.api-status.unset .api-status-dot{background:var(--red)}
-.settings-note{font-size:11px;color:var(--tx3);line-height:1.7;margin-top:10px;padding:10px;background:var(--sub);border-radius:var(--rsm);border:1px solid var(--bd)}
+/* SETTINGS */
+.stitle{font-size:12px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bd)}
+.key-wrap{position:relative;margin-bottom:8px}
+.key-inp{width:100%;font-size:13px;padding:10px 44px 10px 12px;border:1px solid var(--bd2);border-radius:var(--rsm);background:var(--inp);color:var(--tx);font-family:'Courier New',monospace;letter-spacing:.5px}
+.key-inp:focus{outline:none;border-color:var(--org);background:#fff}
+.key-eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;padding:4px;color:var(--tx2)}
+.key-status{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:var(--rsm);margin-bottom:10px;font-size:12px;font-weight:600}
+.key-status.set  {background:var(--grn-l);color:var(--grn);border:1px solid var(--grn-b)}
+.key-status.unset{background:var(--red-l);color:var(--red);border:1px solid var(--red-b)}
+.key-status-dot{width:8px;height:8px;border-radius:50%}
+.key-status.set   .key-status-dot{background:var(--grn)}
+.key-status.unset .key-status-dot{background:var(--red)}
+.note{font-size:11px;color:var(--tx3);line-height:1.7;margin-top:8px;padding:10px;background:var(--sub);border-radius:var(--rsm);border:1px solid var(--bd)}
+.note a{color:var(--org)}
+.settings-sep{height:1px;background:var(--bd);margin:18px 0}
 
 /* UPLOAD */
 .uzone{border:2px dashed var(--bd2);border-radius:var(--rs);padding:28px 20px;text-align:center;cursor:pointer;position:relative;overflow:hidden;transition:all .2s;background:var(--sub);margin-bottom:14px}
@@ -147,8 +160,6 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
 .prev-wrap{display:none;position:relative;margin-bottom:14px}
 .prev-img{width:100%;max-height:280px;object-fit:contain;border-radius:var(--rs);border:1px solid var(--bd);background:var(--sub);display:block}
 .prev-chg{position:absolute;top:8px;right:8px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:var(--rsm);border:1px solid var(--bd);background:rgba(255,255,255,.92);color:var(--tx2);cursor:pointer}
-
-/* AI BAR */
 .aibar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--sub);border:1px solid var(--bd);border-radius:var(--rs);margin-bottom:14px}
 .aidot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--tx3)}
 .aidot.loading{background:var(--org);animation:blink 1s infinite}
@@ -177,6 +188,7 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
 .btn-p{width:100%;padding:14px;border-radius:var(--r);border:none;background:var(--org);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;transition:background .15s;margin-top:8px}
 .btn-p:hover{background:#d97200}
 .btn-c{width:100%;padding:12px;border-radius:var(--r);border:1px solid var(--bd);background:transparent;color:var(--tx2);font-size:14px;cursor:pointer;font-family:inherit;margin-top:8px}
+.btn-danger{width:100%;padding:12px;border-radius:var(--r);border:1px solid var(--red-b);background:var(--red-l);color:var(--red);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px}
 
 /* DETAIL */
 .det-img{width:100%;max-height:260px;object-fit:contain;object-position:top;display:block;background:var(--sub);border-bottom:1px solid var(--bd)}
@@ -213,22 +225,22 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
     <div>
       <div class="hdr-badge">ぬーまん × Venture Films</div>
       <div class="hdr-ttl"><div class="hdr-dot"></div>参考アカウント管理</div>
-      <div class="hdr-sub">スクショをAIが自動で読み取ります　v1.3.0</div>
+      <div class="hdr-sub">v1.5.0　GitHub同期対応</div>
     </div>
     <div class="hdr-right">
-      <button class="settings-btn" onclick="Settings.open()" title="APIキー設定">⚙️</button>
+      <button class="icon-btn" onclick="Settings.open()" title="設定">⚙️</button>
       <a href="index.html" class="back-a">← タスク</a>
     </div>
   </div>
   <div class="pbar"><div class="pbar-f" id="pbar-f"></div></div>
 </header>
 
-<!-- API KEY BANNER -->
-<div id="api-banner" style="display:none">
-  <div class="api-banner">
-    <div class="api-banner-txt">⚠️ APIキーが未設定です。<br>スクショの自動読み取りを使うには⚙️から設定してください。</div>
-    <button class="api-banner-btn" onclick="Settings.open()">設定する</button>
-  </div>
+<!-- SYNC STATUS BAR -->
+<div class="sync-bar" id="sync-bar">
+  <div class="sync-dot notoken" id="sync-dot"></div>
+  <div class="sync-txt" id="sync-txt">読み込み中...</div>
+  <div class="sync-time" id="sync-time"></div>
+  <button class="sync-btn" id="sync-btn" onclick="GH.pull()" style="display:none">🔄 更新</button>
 </div>
 
 <!-- FILTER -->
@@ -237,7 +249,7 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
 <!-- CONTENT -->
 <div class="wrap">
   <div class="stats" id="stats"></div>
-  <button class="add-btn" onclick="App.openAdd()">📸&nbsp;&nbsp;スクショを追加する</button>
+  <button class="add-btn" id="add-btn-main" onclick="App.openAdd()" style="display:none">📸&nbsp;&nbsp;スクショを追加する</button>
   <div class="cards" id="cards"></div>
 </div>
 
@@ -247,27 +259,39 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
     <div class="mhandle"></div>
     <div class="mhdr">
       <div class="mttl">⚙️ 設定</div>
-      <div class="msub">APIキーはこのブラウザにのみ保存されます。外部には送信されません。</div>
+      <div class="msub">キーはこのブラウザにのみ保存されます。</div>
     </div>
     <div class="mbody">
-      <div class="settings-section">
-        <div class="settings-section-title">Anthropic APIキー</div>
-        <div class="api-key-wrap">
-          <input class="api-key-input" type="password" id="api-key-input" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false">
-          <button class="api-key-toggle" id="api-key-toggle" onclick="Settings.toggleVisibility()">👁</button>
-        </div>
-        <div class="api-status" id="api-status">
-          <div class="api-status-dot"></div>
-          <span id="api-status-txt">未設定</span>
-        </div>
-        <div class="settings-note">
-          🔒 このキーはあなたのブラウザのlocalStorageにのみ保存されます。<br>
-          GitHubのソースコードには含まれません。<br>
-          APIキーは <a href="https://console.anthropic.com/" target="_blank" style="color:var(--org)">console.anthropic.com</a> から取得できます。
-        </div>
+
+      <!-- GitHub Token -->
+      <div class="stitle">GitHub Personal Access Token（書き込み用）</div>
+      <div class="key-wrap">
+        <input class="key-inp" type="password" id="gh-token-inp" placeholder="ghp_xxxx..." autocomplete="off" spellcheck="false">
+        <button class="key-eye" onclick="Settings.toggle('gh-token-inp','gh-eye')" id="gh-eye">👁</button>
       </div>
+      <div class="key-status" id="gh-status"><div class="key-status-dot"></div><span id="gh-status-txt">未設定</span></div>
+      <div class="note">
+        🔑 ぬーまん専用。GitHub Personal Access Token（repo権限）を入力してください。<br>
+        高野さんは入力不要です（読み取りのみ自動で動きます）。<br>
+        トークンは <a href="https://github.com/settings/tokens/new" target="_blank">github.com/settings/tokens/new</a> から発行。
+      </div>
+
+      <div class="settings-sep"></div>
+
+      <!-- Anthropic API Key -->
+      <div class="stitle">Anthropic APIキー（AI読み取り用）</div>
+      <div class="key-wrap">
+        <input class="key-inp" type="password" id="api-key-inp" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false">
+        <button class="key-eye" onclick="Settings.toggle('api-key-inp','api-eye')" id="api-eye">👁</button>
+      </div>
+      <div class="key-status" id="api-status"><div class="key-status-dot"></div><span id="api-status-txt">未設定</span></div>
+      <div class="note">
+        🤖 スクショからプロフィール情報を自動読み取りするために使用します。<br>
+        <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a> から取得。
+      </div>
+
       <button class="btn-p" onclick="Settings.save()">保存する</button>
-      <button class="btn-c" onclick="Settings.clear()">キーを削除する</button>
+      <button class="btn-c" onclick="Modal.close('m-settings')">キャンセル</button>
     </div>
   </div>
 </div>
@@ -278,14 +302,14 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
     <div class="mhandle"></div>
     <div class="mhdr">
       <div class="mttl" id="m-add-ttl">アカウントを追加</div>
-      <div class="msub" id="m-add-sub">Instagramプロフィールのスクショを選択するとAIが自動で読み取ります。</div>
+      <div class="msub">Instagramプロフィールのスクショを選択するとAIが読み取ります。</div>
     </div>
     <div class="mbody">
       <div class="uzone" id="uz-add" ondragover="App.dov(event,'uz-add')" ondragleave="App.dlv(event,'uz-add')" ondrop="App.ddrop(event,'add')">
         <input type="file" accept="image/*" id="fi-add" onchange="App.fsel(event,'add')">
         <div class="uzone-ico">📸</div>
         <div class="uzone-ttl">スクショをタップして選択</div>
-        <div class="uzone-sub">アップロードするとAIが自動で読み取ります</div>
+        <div class="uzone-sub">AIが自動で読み取ります</div>
       </div>
       <div class="prev-wrap" id="pw-add">
         <img class="prev-img" id="pi-add" alt="">
@@ -317,7 +341,7 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
         </div>
         <div class="fsect">メモ</div>
         <div class="fg"><label>学べるポイント・メモ</label><textarea id="f-memo" placeholder="例：サムネ統一が秀逸。キレ始まりの構成が参考になる。"></textarea></div>
-        <button class="btn-p" onclick="App.save()">登録する</button>
+        <button class="btn-p" onclick="App.save()">登録してGitHubに保存</button>
         <button class="btn-c" onclick="Modal.close('m-add')">キャンセル</button>
       </div>
     </div>
@@ -330,7 +354,7 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
     <div class="mhandle"></div>
     <div class="mhdr">
       <div class="mttl" id="m-upd-ttl">情報を更新</div>
-      <div class="msub" id="m-upd-sub">最新のスクショをアップロードしてください。AIが自動で読み取って上書きします。</div>
+      <div class="msub" id="m-upd-sub">最新のスクショをアップロードしてください。</div>
     </div>
     <div class="mbody">
       <div class="uzone" id="uz-upd" ondragover="App.dov(event,'uz-upd')" ondragleave="App.dlv(event,'uz-upd')" ondrop="App.ddrop(event,'upd')">
@@ -356,7 +380,7 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
         </div>
         <div class="fg"><label>プロフィール文</label><textarea id="u-bio" rows="3"></textarea></div>
         <div class="fg"><label>メモ</label><textarea id="u-memo" rows="2"></textarea></div>
-        <button class="btn-p" onclick="App.saveUpd()">この内容で更新する</button>
+        <button class="btn-p" onclick="App.saveUpd()">この内容で更新してGitHubに保存</button>
         <button class="btn-c" onclick="Modal.close('m-upd')">キャンセル</button>
       </div>
     </div>
@@ -375,9 +399,13 @@ body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:va
    CONFIG
 ============================================================ */
 var CFG = {
-  VER:       '1.3.0',
-  STORE:     'nu_accounts_v1',
-  KEY_STORE: 'nu_api_key',
+  VER:       '1.5.0',
+  GH_OWNER:  'nu-man1029',
+  GH_REPO:   'consul_tool',
+  GH_FILE:   'data.json',
+  GH_BRANCH: 'main',
+  GH_KEY:    'nu_gh_token',
+  API_KEY:   'nu_api_key',
   MODEL:     'claude-sonnet-4-20250514',
   CATS: {
     rival:  { label:'競合',        tag:'tag-rival',  opt:'s-rival'  },
@@ -394,134 +422,239 @@ var CFG = {
 };
 
 /* ============================================================
-   SETTINGS — APIキー管理
+   SETTINGS
 ============================================================ */
 var Settings = {
-  _visible: false,
+  _vis: {},
 
-  getKey: function() {
-    try { return localStorage.getItem(CFG.KEY_STORE) || ''; } catch(e) { return ''; }
-  },
+  getGHToken:  function() { try { return localStorage.getItem(CFG.GH_KEY)  || ''; } catch(e) { return ''; } },
+  getAPIKey:   function() { try { return localStorage.getItem(CFG.API_KEY) || ''; } catch(e) { return ''; } },
+  hasGHToken:  function() { var t = this.getGHToken();  return t && t.startsWith('ghp_'); },
+  hasAPIKey:   function() { var k = this.getAPIKey();   return k && k.startsWith('sk-ant-'); },
 
   open: function() {
-    var key = this.getKey();
-    var inp = document.getElementById('api-key-input');
-    inp.value = key;
-    inp.type = 'password';
-    this._visible = false;
-    document.getElementById('api-key-toggle').textContent = '👁';
-    this._updateStatus(key);
+    var t = this.getGHToken(), k = this.getAPIKey();
+    var ti = document.getElementById('gh-token-inp');
+    var ki = document.getElementById('api-key-inp');
+    ti.value = t; ti.type = 'password';
+    ki.value = k; ki.type = 'password';
+    this._vis = {};
+    document.getElementById('gh-eye').textContent  = '👁';
+    document.getElementById('api-eye').textContent = '👁';
+    this._updateStatus('gh',  t);
+    this._updateStatus('api', k);
     Modal.open('m-settings');
   },
 
+  toggle: function(inputId, eyeId) {
+    var inp = document.getElementById(inputId);
+    var eye = document.getElementById(eyeId);
+    var key = inputId;
+    this._vis[key] = !this._vis[key];
+    inp.type = this._vis[key] ? 'text' : 'password';
+    eye.textContent = this._vis[key] ? '🙈' : '👁';
+  },
+
   save: function() {
-    var key = document.getElementById('api-key-input').value.trim();
-    if (!key) { Util.toast('APIキーを入力してください'); return; }
-    if (!key.startsWith('sk-ant-')) { Util.toast('APIキーの形式が正しくありません（sk-ant-で始まります）'); return; }
-    try { localStorage.setItem(CFG.KEY_STORE, key); } catch(e) {}
-    this._updateStatus(key);
-    Render.banner();
-    Modal.close('m-settings');
-    Util.toast('APIキーを保存しました');
-  },
-
-  clear: function() {
-    if (!confirm('APIキーを削除しますか？')) return;
-    try { localStorage.removeItem(CFG.KEY_STORE); } catch(e) {}
-    document.getElementById('api-key-input').value = '';
-    this._updateStatus('');
-    Render.banner();
-    Modal.close('m-settings');
-    Util.toast('APIキーを削除しました');
-  },
-
-  toggleVisibility: function() {
-    this._visible = !this._visible;
-    document.getElementById('api-key-input').type = this._visible ? 'text' : 'password';
-    document.getElementById('api-key-toggle').textContent = this._visible ? '🙈' : '👁';
-  },
-
-  _updateStatus: function(key) {
-    var el  = document.getElementById('api-status');
-    var txt = document.getElementById('api-status-txt');
-    if (key && key.startsWith('sk-ant-')) {
-      el.className  = 'api-status set';
-      txt.textContent = '設定済み（' + key.substring(0, 12) + '...）';
-    } else {
-      el.className  = 'api-status unset';
-      txt.textContent = '未設定';
+    var t = document.getElementById('gh-token-inp').value.trim();
+    var k = document.getElementById('api-key-inp').value.trim();
+    if (t) {
+      if (!t.startsWith('ghp_') && !t.startsWith('github_pat_')) {
+        Util.toast('GitHubトークンの形式が正しくありません'); return;
+      }
+      try { localStorage.setItem(CFG.GH_KEY, t); } catch(e) {}
     }
+    if (k) {
+      if (!k.startsWith('sk-ant-')) { Util.toast('APIキーの形式が正しくありません'); return; }
+      try { localStorage.setItem(CFG.API_KEY, k); } catch(e) {}
+    }
+    this._updateStatus('gh',  t);
+    this._updateStatus('api', k);
+    Modal.close('m-settings');
+    Render.addBtn();
+    Util.toast('設定を保存しました');
+    if (t) GH.pull();
+  },
+
+  _updateStatus: function(type, val) {
+    var prefix = type === 'gh' ? 'gh' : 'api';
+    var valid  = type === 'gh' ? (val && (val.startsWith('ghp_') || val.startsWith('github_pat_'))) : (val && val.startsWith('sk-ant-'));
+    var el  = document.getElementById(prefix + '-status');
+    var txt = document.getElementById(prefix + '-status-txt');
+    el.className  = 'key-status ' + (valid ? 'set' : 'unset');
+    txt.textContent = valid ? '設定済み（' + val.substring(0,14) + '...）' : '未設定';
+  },
+};
+
+/* ============================================================
+   GITHUB SYNC
+============================================================ */
+var GH = {
+  _sha: null,  // 最新のファイルSHA（更新時に必要）
+
+  _apiUrl: function() {
+    return 'https://api.github.com/repos/' + CFG.GH_OWNER + '/' + CFG.GH_REPO + '/contents/' + CFG.GH_FILE;
+  },
+
+  // データ読み込み（トークン不要・公開リポジトリなので誰でも読める）
+  pull: function() {
+    Render.syncStatus('loading', '最新データを取得中...');
+    var url = this._apiUrl() + '?ref=' + CFG.GH_BRANCH + '&t=' + Date.now();
+    fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json' } })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (!d.content) throw new Error('ファイルが見つかりません');
+        GH._sha = d.sha;
+        var json = JSON.parse(atob(d.content.replace(/\n/g, '')));
+        Data.list = json.accounts || [];
+        var now = new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
+        Render.syncStatus('ok', '同期済み', now);
+        Render.all();
+      })
+      .catch(function(e) {
+        Render.syncStatus('err', 'データ取得失敗：' + e.message);
+        // フォールバック：localStorageから読む
+        try {
+          var local = localStorage.getItem('nu_accounts_local');
+          if (local) Data.list = JSON.parse(local);
+        } catch(ex) {}
+        Render.all();
+      });
+  },
+
+  // データ書き込み（トークン必要）
+  push: function(callback) {
+    var token = Settings.getGHToken();
+    if (!token) { if (callback) callback(new Error('GitHubトークンが未設定です')); return; }
+    var content = btoa(unescape(encodeURIComponent(JSON.stringify({ accounts: Data.list }, null, 2))));
+    var body = { message: 'Update accounts data', content: content, branch: CFG.GH_BRANCH };
+    if (GH._sha) body.sha = GH._sha;
+    Render.syncStatus('loading', 'GitHubに保存中...');
+    fetch(GH._apiUrl(), {
+      method: 'PUT',
+      headers: {
+        'Authorization': 'token ' + token,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.content && d.content.sha) GH._sha = d.content.sha;
+      var now = new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
+      Render.syncStatus('ok', '保存しました', now);
+      // localStorageにもバックアップ
+      try { localStorage.setItem('nu_accounts_local', JSON.stringify(Data.list)); } catch(ex) {}
+      if (callback) callback(null);
+    })
+    .catch(function(e) {
+      Render.syncStatus('err', '保存失敗：' + e.message);
+      if (callback) callback(e);
+    });
   },
 };
 
 /* ============================================================
    DATA
 ============================================================ */
-var Data = {
-  list: [],
-  load: function() {
-    try { var d = localStorage.getItem(CFG.STORE); if (d) this.list = JSON.parse(d); } catch(e) {}
-    if (!this.list.length) this._sample();
-  },
-  save: function()     { try { localStorage.setItem(CFG.STORE, JSON.stringify(this.list)); } catch(e) {} },
-  add: function(a)     { this.list.unshift(a); this.save(); },
-  update: function(id, data) {
-    var i = this.list.findIndex(function(x){ return x.id === id; });
-    if (i > -1) { this.list[i] = Object.assign({}, this.list[i], data); this.save(); }
-  },
-  del: function(id)    { this.list = this.list.filter(function(x){ return x.id !== id; }); this.save(); },
-  filtered: function(f){ return f === 'all' ? this.list : this.list.filter(function(a){ return (a.cats||[]).indexOf(f) > -1; }); },
-  cnt: function(f)     { return f === 'all' ? this.list.length : this.list.filter(function(a){ return (a.cats||[]).indexOf(f) > -1; }).length; },
-  _sample: function() {
-    this.list = [
-      { id:'s1', accountId:'cement_prince', name:'セメント王子',
-        posts:'138', followers:'2.2万', following:'838',
-        bio:'建築デザイナー\nセメントパワーで壊さず映えリフォームをしている✨ リフォーム最強の王子👑',
-        genre:'建築・リフォーム', cats:['rival','goal'], imageB64:null,
-        memo:'同ジャンルの最強ライバル。2.2万フォロワー。共同投稿候補。',
-        createdAt:'2026/3/16', updatedAt:'2026/3/16' },
-      { id:'s2', accountId:'vegetable.change', name:'ベジチェンすみ：野菜が好きになる家庭菜園研究家',
-        posts:'1202', followers:'1.1万', following:'558',
-        bio:'畑も料理も。初めてさん大歓迎！\n育てて・食べて・全国の仲間とつながる「ベジとも」コミュニティ',
-        genre:'農業・家庭菜園', cats:['ref','takano'], imageB64:null,
-        memo:'高野さん推薦。半年で1万人達成。構成・話し方・サムネ統一・キレ始まりが秀逸。',
-        createdAt:'2026/3/16', updatedAt:'2026/3/16' },
-    ];
-    this.save();
-  },
-};
+var Data = { list: [] };
+
+/* ============================================================
+   IMAGE COMPRESS
+============================================================ */
+function compressImage(dataUrl, callback) {
+  var img = new Image();
+  img.onload = function() {
+    var canvas = document.createElement('canvas');
+    var MAX = 800;
+    var w = img.width, h = img.height;
+    if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+    if (h > MAX * 2) { w = Math.round(w * MAX * 2 / h); h = MAX * 2; }
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    callback(canvas.toDataURL('image/jpeg', 0.7));
+  };
+  img.src = dataUrl;
+}
+
+/* ============================================================
+   AI HELPER
+============================================================ */
+function callAI(b64, callback) {
+  var key = Settings.getAPIKey();
+  if (!key) { callback(null, 'APIキーが未設定です。⚙️から設定してください。'); return; }
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: CFG.MODEL, max_tokens: 1200,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
+        { type: 'text', text: CFG.PROMPT },
+      ]}],
+    }),
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.error) { callback(null, d.error.message || 'APIエラー'); return; }
+    var json = JSON.parse(d.content[0].text.replace(/```json|```/g,'').trim());
+    callback(json, null);
+  })
+  .catch(function(e) { callback(null, '通信エラー：' + e.message); });
+}
+
+function setAI(prefix, state, msg) {
+  document.getElementById('ad-'+prefix).className = 'aidot ' + state;
+  document.getElementById('at-'+prefix).textContent = msg;
+}
 
 /* ============================================================
    RENDER
 ============================================================ */
 var Render = {
   filter: 'all',
-  setFilter: function(f) { this.filter = f; this.all(); },
-  all: function() { this.tabs(); this.stats(); this.cards(); this.progress(); this.banner(); },
+  setFilter: function(f) { this.filter = f; this.cards(); this.tabs(); },
+  all: function() { this.tabs(); this.stats(); this.cards(); this.progress(); this.addBtn(); },
 
-  banner: function() {
-    var key = Settings.getKey();
-    var el = document.getElementById('api-banner');
-    el.style.display = (key && key.startsWith('sk-ant-')) ? 'none' : 'block';
+  syncStatus: function(state, msg, time) {
+    document.getElementById('sync-dot').className = 'sync-dot ' + state;
+    document.getElementById('sync-txt').textContent = msg;
+    document.getElementById('sync-time').textContent = time || '';
+    document.getElementById('sync-btn').style.display = (state === 'ok' || state === 'err') ? 'block' : 'none';
+  },
+
+  addBtn: function() {
+    // GitHubトークンがある場合のみ追加ボタンを表示
+    document.getElementById('add-btn-main').style.display = Settings.hasGHToken() ? 'flex' : 'none';
   },
 
   tabs: function() {
     document.getElementById('fbar').innerHTML = CFG.FILTERS.map(function(f) {
       var on = Render.filter === f.id ? ' on' : '';
-      return '<button class="ftab' + on + '" onclick="Render.setFilter(\'' + f.id + '\')">' + f.label + '<span class="fcnt">' + Data.cnt(f.id) + '</span></button>';
+      return '<button class="ftab'+on+'" onclick="Render.setFilter(\''+f.id+'\')">'+f.label+'<span class="fcnt">'+Render._cnt(f.id)+'</span></button>';
     }).join('');
+  },
+
+  _cnt: function(f) {
+    return f === 'all' ? Data.list.length : Data.list.filter(function(a){ return (a.cats||[]).indexOf(f) > -1; }).length;
   },
 
   stats: function() {
     document.getElementById('stats').innerHTML =
-      '<div class="sc"><div class="sc-n">' + Data.list.length + '</div><div class="sc-l">登録総数</div></div>' +
-      '<div class="sc"><div class="sc-n">' + Data.cnt('rival') + '</div><div class="sc-l">競合</div></div>' +
-      '<div class="sc"><div class="sc-n">' + Data.cnt('goal')  + '</div><div class="sc-l">目標</div></div>';
+      '<div class="sc"><div class="sc-n">'+Data.list.length+'</div><div class="sc-l">登録総数</div></div>'+
+      '<div class="sc"><div class="sc-n">'+this._cnt('rival')+'</div><div class="sc-l">競合</div></div>'+
+      '<div class="sc"><div class="sc-n">'+this._cnt('goal')+'</div><div class="sc-l">目標</div></div>';
   },
 
   cards: function() {
     var el = document.getElementById('cards');
-    var list = Data.filtered(this.filter);
+    var list = this.filter === 'all' ? Data.list : Data.list.filter(function(a){ return (a.cats||[]).indexOf(Render.filter) > -1; });
     if (!list.length) {
       el.innerHTML = '<div class="empty"><div class="empty-ico">📱</div><div class="empty-ttl">アカウントがまだありません</div><div class="empty-sub">「スクショを追加する」から登録してください</div></div>';
       return;
@@ -530,57 +663,50 @@ var Render = {
   },
 
   _card: function(a) {
-    var tags = (a.cats||[]).map(function(c) {
-      var info = CFG.CATS[c];
-      return info ? '<span class="tag ' + info.tag + '">' + info.label + '</span>' : '';
-    }).join('');
-    var gTag    = a.genre ? '<span class="tag tag-genre">' + a.genre + '</span>' : '';
-    var imgEl   = a.imageB64 ? '<img class="acard-img" src="' + a.imageB64 + '" alt="' + (a.name||'') + '" loading="lazy">' : '';
-    var statEl  = (a.followers || a.posts || a.following) ?
-      '<div class="astats">' +
-      (a.followers ? '<div class="ast"><div class="ast-n">' + a.followers + '</div><div class="ast-l">フォロワー</div></div>' : '') +
-      (a.posts     ? '<div class="ast"><div class="ast-n">' + a.posts     + '</div><div class="ast-l">投稿</div></div>' : '') +
-      (a.following ? '<div class="ast"><div class="ast-n">' + a.following + '</div><div class="ast-l">フォロー中</div></div>' : '') +
+    var tags = (a.cats||[]).map(function(c) { var i=CFG.CATS[c]; return i?'<span class="tag '+i.tag+'">'+i.label+'</span>':''; }).join('');
+    var gTag   = a.genre ? '<span class="tag tag-genre">'+a.genre+'</span>' : '';
+    var imgEl  = a.imageB64 ? '<img class="acard-img" src="'+a.imageB64+'" alt="'+(a.name||'')+'" loading="lazy">' : '';
+    var stEl   = (a.followers||a.posts||a.following) ?
+      '<div class="astats">'+
+      (a.followers?'<div class="ast"><div class="ast-n">'+a.followers+'</div><div class="ast-l">フォロワー</div></div>':'')+
+      (a.posts?'<div class="ast"><div class="ast-n">'+a.posts+'</div><div class="ast-l">投稿</div></div>':'')+
+      (a.following?'<div class="ast"><div class="ast-n">'+a.following+'</div><div class="ast-l">フォロー中</div></div>':'')+
       '</div>' : '';
-    var bioEl   = a.bio  ? '<div class="abio">'  + (a.bio||'').replace(/\n/g,'　') + '</div>' : '';
-    var memoEl  = a.memo ? '<div class="amemo">' + a.memo + '</div>' : '';
-    var dateEl  = Render._dateEl(a);
-    return '<div class="acard">' + imgEl +
-      '<div class="abody">' +
-        '<div class="arow"><div class="aav">📷</div>' +
-        '<div class="ainfo"><div class="aname">' + (a.name||'—') + '</div>' +
-        '<div class="aid">@' + (a.accountId||'') + '</div></div></div>' +
-        statEl +
-        '<div class="atags">' + tags + gTag + '</div>' +
-        bioEl + memoEl + dateEl +
-        '<div class="aacts">' +
-          '<button class="aact" onclick="App.openDet(\'' + a.id + '\')">詳細を見る</button>' +
-          '<button class="aact upd" onclick="App.openUpd(\'' + a.id + '\')">🔄 更新</button>' +
-          '<a class="aact open" href="https://www.instagram.com/' + (a.accountId||'') + '/" target="_blank">開く →</a>' +
-        '</div>' +
+    var bioEl  = a.bio  ? '<div class="abio">'+(a.bio||'').replace(/\n/g,'　')+'</div>' : '';
+    var memoEl = a.memo ? '<div class="amemo">'+a.memo+'</div>' : '';
+    var dateEl = Render._dateEl(a);
+    var updBtn = Settings.hasGHToken() ? '<button class="aact upd" onclick="App.openUpd(\''+a.id+'\')">🔄 更新</button>' : '';
+    return '<div class="acard">'+imgEl+
+      '<div class="abody">'+
+        '<div class="arow"><div class="aav">📷</div>'+
+        '<div class="ainfo"><div class="aname">'+(a.name||'—')+'</div>'+
+        '<div class="aid">@'+(a.accountId||'')+'</div></div></div>'+
+        stEl+'<div class="atags">'+tags+gTag+'</div>'+bioEl+memoEl+dateEl+
+        '<div class="aacts">'+
+          '<button class="aact" onclick="App.openDet(\''+a.id+'\')">詳細を見る</button>'+
+          updBtn+
+          '<a class="aact open" href="https://www.instagram.com/'+(a.accountId||'')+'/" target="_blank">開く →</a>'+
+        '</div>'+
       '</div></div>';
   },
 
   _dateEl: function(a) {
-    var base = a.updatedAt || a.createdAt;
-    if (!base) return '';
-    var parts = base.split('/');
-    if (parts.length < 3) return '<div class="adate">📅 登録：' + base + '</div>';
-    var d    = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
-    var days = Math.floor((Date.now() - d.getTime()) / (1000*60*60*24));
+    var base = a.updatedAt || a.createdAt; if (!base) return '';
+    var parts = base.split('/'); if (parts.length < 3) return '<div class="adate">📅 登録：'+base+'</div>';
+    var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+    var days = Math.floor((Date.now()-d.getTime())/(1000*60*60*24));
     var cls, badge;
-    if (days >= 30)      { cls = 'adate-old';  badge = days + '日前・要更新'; }
-    else if (days >= 14) { cls = 'adate-warn'; badge = days + '日前'; }
-    else if (days === 0) { cls = 'adate-ok';   badge = '今日'; }
-    else                 { cls = 'adate-ok';   badge = days + '日前'; }
-    var upd = (a.updatedAt && a.updatedAt !== a.createdAt) ? '　更新：' + a.updatedAt : '';
-    return '<div class="adate">📅 登録：' + (a.createdAt||'—') + upd +
-      '&nbsp;<span class="adate-label ' + cls + '">' + badge + '</span></div>';
+    if (days >= 30)      { cls='adate-old';  badge=days+'日前・要更新'; }
+    else if (days >= 14) { cls='adate-warn'; badge=days+'日前'; }
+    else if (days === 0) { cls='adate-ok';   badge='今日'; }
+    else                 { cls='adate-ok';   badge=days+'日前'; }
+    var upd = (a.updatedAt&&a.updatedAt!==a.createdAt)?'　更新：'+a.updatedAt:'';
+    return '<div class="adate">📅 登録：'+(a.createdAt||'—')+upd+'&nbsp;<span class="adate-label '+cls+'">'+badge+'</span></div>';
   },
 
   progress: function() {
-    var g = Data.cnt('goal'), all = Data.list.length;
-    document.getElementById('pbar-f').style.width = all ? Math.round(g/all*100) + '%' : '0%';
+    var g = this._cnt('goal'), all = Data.list.length;
+    document.getElementById('pbar-f').style.width = all ? Math.round(g/all*100)+'%' : '0%';
   },
 };
 
@@ -590,276 +716,239 @@ var Render = {
 var Modal = {
   open:  function(id) { document.getElementById(id).classList.add('open'); },
   close: function(id) { document.getElementById(id).classList.remove('open'); },
-  bg:    function(e, id) { if (e.target === document.getElementById(id)) this.close(id); },
+  bg:    function(e, id) { if (e.target===document.getElementById(id)) this.close(id); },
 };
-
-/* ============================================================
-   AI HELPER
-============================================================ */
-function callAI(b64, callback) {
-  var key = Settings.getKey();
-  if (!key) { callback(null, 'APIキーが設定されていません。⚙️から設定してください。'); return; }
-  fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-    body: JSON.stringify({
-      model: CFG.MODEL,
-      max_tokens: 1200,
-      messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
-        { type: 'text', text: CFG.PROMPT },
-      ]}],
-    }),
-  })
-  .then(function(res) { return res.json(); })
-  .then(function(data) {
-    if (data.error) { callback(null, data.error.message || 'APIエラーが発生しました'); return; }
-    var json = JSON.parse(data.content[0].text.replace(/```json|```/g,'').trim());
-    callback(json, null);
-  })
-  .catch(function(e) { callback(null, '通信エラー：' + e.message); });
-}
-
-function setAI(prefix, state, msg) {
-  document.getElementById('ad-' + prefix).className = 'aidot ' + state;
-  document.getElementById('at-' + prefix).textContent = msg;
-}
 
 /* ============================================================
    APP
 ============================================================ */
 var App = {
-  _editId: null,
-  _cats:   null,
-  _imgB64: null,
-  _updId:  null,
-  _updB64: null,
+  _editId: null, _cats: null, _imgB64: null,
+  _updId: null,  _updB64: null,
 
   openAdd: function() {
-    this._editId = null;
-    this._cats   = new Set();
-    this._imgB64 = null;
+    this._editId=null; this._cats=new Set(); this._imgB64=null;
     document.getElementById('m-add-ttl').textContent = 'アカウントを追加';
-    this._resetAddForm();
+    this._resetAdd();
     Modal.open('m-add');
   },
 
-  _resetAddForm: function() {
-    var ids = ['f-id','f-name','f-posts','f-flw','f-fling','f-bio','f-genre','f-memo'];
-    ids.forEach(function(id) { var el=document.getElementById(id); if(el) el.value=''; });
-    ['rival','ref','goal','takano'].forEach(function(c) { document.getElementById('co-'+c).className='copt'; });
-    document.getElementById('uz-add').style.display = 'block';
-    document.getElementById('pw-add').style.display = 'none';
-    document.getElementById('ai-add').style.display = 'none';
-    document.getElementById('fa-add').style.display = 'none';
-    document.getElementById('fi-add').value = '';
+  _resetAdd: function() {
+    ['f-id','f-name','f-posts','f-flw','f-fling','f-bio','f-genre','f-memo'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    ['rival','ref','goal','takano'].forEach(function(c){ document.getElementById('co-'+c).className='copt'; });
+    document.getElementById('uz-add').style.display='block';
+    document.getElementById('pw-add').style.display='none';
+    document.getElementById('ai-add').style.display='none';
+    document.getElementById('fa-add').style.display='none';
+    document.getElementById('fi-add').value='';
   },
 
-  dov:  function(e,zid) { e.preventDefault(); document.getElementById(zid).classList.add('on'); },
-  dlv:  function(e,zid) { document.getElementById(zid).classList.remove('on'); },
-  ddrop: function(e,mode) { e.preventDefault(); this.dlv(e,'uz-'+mode); var f=e.dataTransfer.files[0]; if(f) this._process(f,mode); },
-  fsel:  function(e,mode) { var f=e.target.files[0]; if(f) this._process(f,mode); },
+  dov:   function(e,z) { e.preventDefault(); document.getElementById(z).classList.add('on'); },
+  dlv:   function(e,z) { document.getElementById(z).classList.remove('on'); },
+  ddrop: function(e,m) { e.preventDefault(); this.dlv(e,'uz-'+m); var f=e.dataTransfer.files[0]; if(f) this._proc(f,m); },
+  fsel:  function(e,m) { var f=e.target.files[0]; if(f) this._proc(f,m); },
 
-  resetImg: function(mode) {
-    if (mode==='add') { this._imgB64=null; this._resetAddForm(); }
-    else { this._updB64=null; this._resetUpdForm(); }
+  resetImg: function(m) {
+    if(m==='add'){this._imgB64=null;this._resetAdd();}
+    else{this._updB64=null;this._resetUpd();}
   },
 
-  _process: function(file, mode) {
-    var self = this;
-    var reader = new FileReader();
-    reader.onload = function(ev) {
-      var b64 = ev.target.result;
-      if (mode==='add') self._imgB64=b64; else self._updB64=b64;
-      document.getElementById('pi-'+mode).src           = b64;
-      document.getElementById('uz-'+mode).style.display = 'none';
-      document.getElementById('pw-'+mode).style.display = 'block';
-      document.getElementById('ai-'+mode).style.display = 'flex';
-      setAI(mode, 'loading', 'AIがプロフィールを読み取り中...');
-      if (mode==='add') self._analyzeAdd(b64.split(',')[1]);
-      else self._analyzeUpd(b64.split(',')[1]);
+  _proc: function(file, m) {
+    var self=this;
+    var r=new FileReader();
+    r.onload=function(ev){
+      compressImage(ev.target.result, function(compressed){
+        if(m==='add') self._imgB64=compressed; else self._updB64=compressed;
+        document.getElementById('pi-'+m).src=compressed;
+        document.getElementById('uz-'+m).style.display='none';
+        document.getElementById('pw-'+m).style.display='block';
+        document.getElementById('ai-'+m).style.display='flex';
+        setAI(m,'loading','AIがプロフィールを読み取り中...');
+        if(m==='add') self._analyzeAdd(compressed.split(',')[1]);
+        else self._analyzeUpd(compressed.split(',')[1]);
+      });
     };
-    reader.readAsDataURL(file);
+    r.readAsDataURL(file);
   },
 
   _analyzeAdd: function(b64) {
-    callAI(b64, function(json, err) {
-      if (err) {
-        setAI('add', 'err', err);
-        document.getElementById('fa-add').style.display = 'block';
-        return;
-      }
-      var set = function(id,v) { var el=document.getElementById(id); if(el&&v) el.value=v; };
-      set('f-id',json.accountId); set('f-name',json.name);
-      set('f-posts',json.posts);  set('f-flw',json.followers);
-      set('f-fling',json.following); set('f-bio',json.bio);
-      set('f-genre',json.genre);
-      if (['rival','ref','goal'].indexOf(json.category_suggestion) > -1) App.toggleCat(json.category_suggestion);
-      setAI('add', 'done', '読み取り完了！内容を確認して登録してください。');
-      document.getElementById('fa-add').style.display = 'block';
+    callAI(b64, function(json, err){
+      if(err){ setAI('add','err',err); document.getElementById('fa-add').style.display='block'; return; }
+      var s=function(id,v){var el=document.getElementById(id);if(el&&v)el.value=v;};
+      s('f-id',json.accountId); s('f-name',json.name);
+      s('f-posts',json.posts); s('f-flw',json.followers);
+      s('f-fling',json.following); s('f-bio',json.bio); s('f-genre',json.genre);
+      if(['rival','ref','goal'].indexOf(json.category_suggestion)>-1) App.toggleCat(json.category_suggestion);
+      setAI('add','done','読み取り完了！確認して登録してください。');
+      document.getElementById('fa-add').style.display='block';
     });
   },
 
   toggleCat: function(c) {
-    if (!this._cats) this._cats = new Set();
-    var btn = document.getElementById('co-'+c);
-    if (this._cats.has(c)) { this._cats.delete(c); btn.className='copt'; }
-    else { this._cats.add(c); btn.className='copt '+CFG.CATS[c].opt; }
+    if(!this._cats) this._cats=new Set();
+    var btn=document.getElementById('co-'+c);
+    if(this._cats.has(c)){this._cats.delete(c);btn.className='copt';}
+    else{this._cats.add(c);btn.className='copt '+CFG.CATS[c].opt;}
   },
 
   save: function() {
-    var id = document.getElementById('f-id').value.trim();
-    if (!id) { Util.toast('アカウントIDを入力してください'); return; }
-    var today = new Date().toLocaleDateString('ja-JP');
-    var orig  = this._editId ? (Data.list.find(function(x){return x.id===App._editId;})||{}) : {};
-    var a = {
-      id:        this._editId || ('a_'+Date.now()),
+    var id=document.getElementById('f-id').value.trim();
+    if(!id){Util.toast('アカウントIDを入力してください');return;}
+    var today=new Date().toLocaleDateString('ja-JP');
+    var orig=this._editId?(Data.list.find(function(x){return x.id===App._editId;})||{}):{};
+    var a={
+      id:        this._editId||('a_'+Date.now()),
       accountId: id,
-      name:      document.getElementById('f-name').value.trim() || id,
+      name:      document.getElementById('f-name').value.trim()||id,
       posts:     document.getElementById('f-posts').value.trim(),
       followers: document.getElementById('f-flw').value.trim(),
       following: document.getElementById('f-fling').value.trim(),
       bio:       document.getElementById('f-bio').value.trim(),
       genre:     document.getElementById('f-genre').value.trim(),
-      cats:      this._cats ? Array.from(this._cats) : [],
+      cats:      this._cats?Array.from(this._cats):[],
       memo:      document.getElementById('f-memo').value.trim(),
       imageB64:  this._imgB64,
-      createdAt: this._editId ? (orig.createdAt || today) : today,
+      createdAt: this._editId?(orig.createdAt||today):today,
       updatedAt: today,
     };
-    if (this._editId) { Data.update(this._editId, a); Util.toast('@'+id+' を更新しました'); }
-    else { Data.add(a); Util.toast('@'+id+' を登録しました'); }
+    if(this._editId){
+      var idx=Data.list.findIndex(function(x){return x.id===App._editId;});
+      if(idx>-1) Data.list[idx]=Object.assign({},Data.list[idx],a);
+    } else {
+      Data.list.unshift(a);
+    }
     Modal.close('m-add');
-    Render.all();
+    GH.push(function(err){
+      if(!err) Util.toast('@'+id+(App._editId?' を更新しました':' を登録しました'));
+      else Util.toast('⚠️ GitHubへの保存に失敗しました：'+err.message);
+      Render.all();
+    });
   },
 
-  /* ---- UPDATE ---- */
   openUpd: function(id) {
-    var a = Data.list.find(function(x){return x.id===id;});
-    if (!a) return;
-    this._updId  = id;
-    this._updB64 = null;
-    document.getElementById('m-upd-ttl').textContent = '@' + a.accountId + ' を更新';
-    document.getElementById('m-upd-sub').textContent =
-      '登録日：'+(a.createdAt||'—')+'　前回更新：'+(a.updatedAt||a.createdAt||'—')+'　最新スクショをアップロードしてください。';
-    this._resetUpdForm();
+    var a=Data.list.find(function(x){return x.id===id;}); if(!a) return;
+    this._updId=id; this._updB64=null;
+    document.getElementById('m-upd-ttl').textContent='@'+a.accountId+' を更新';
+    document.getElementById('m-upd-sub').textContent='登録日：'+(a.createdAt||'—')+'　前回更新：'+(a.updatedAt||a.createdAt||'—');
+    this._resetUpd();
     Modal.open('m-upd');
   },
 
-  _resetUpdForm: function() {
-    document.getElementById('uz-upd').style.display = 'block';
-    document.getElementById('pw-upd').style.display = 'none';
-    document.getElementById('ai-upd').style.display = 'none';
-    document.getElementById('fa-upd').style.display = 'none';
-    document.getElementById('fi-upd').value = '';
+  _resetUpd: function() {
+    document.getElementById('uz-upd').style.display='block';
+    document.getElementById('pw-upd').style.display='none';
+    document.getElementById('ai-upd').style.display='none';
+    document.getElementById('fa-upd').style.display='none';
+    document.getElementById('fi-upd').value='';
   },
 
   _analyzeUpd: function(b64) {
-    var id = this._updId;
-    var a  = Data.list.find(function(x){return x.id===id;});
-    callAI(b64, function(json, err) {
-      if (err) {
-        setAI('upd', 'err', err);
-        if (a) {
-          document.getElementById('u-flw').value   = a.followers||'';
-          document.getElementById('u-posts').value = a.posts||'';
-          document.getElementById('u-fling').value = a.following||'';
-          document.getElementById('u-bio').value   = a.bio||'';
-          document.getElementById('u-memo').value  = a.memo||'';
+    var id=this._updId;
+    var a=Data.list.find(function(x){return x.id===id;});
+    callAI(b64, function(json,err){
+      if(err){
+        setAI('upd','err',err);
+        if(a){
+          document.getElementById('u-flw').value=a.followers||'';
+          document.getElementById('u-posts').value=a.posts||'';
+          document.getElementById('u-fling').value=a.following||'';
+          document.getElementById('u-bio').value=a.bio||'';
+          document.getElementById('u-memo').value=a.memo||'';
         }
-        document.getElementById('fa-upd').style.display = 'block';
+        document.getElementById('fa-upd').style.display='block';
         return;
       }
-      document.getElementById('u-flw').value   = json.followers || (a&&a.followers||'');
-      document.getElementById('u-posts').value = json.posts     || (a&&a.posts||'');
-      document.getElementById('u-fling').value = json.following || (a&&a.following||'');
-      document.getElementById('u-bio').value   = json.bio       || (a&&a.bio||'');
-      document.getElementById('u-memo').value  = a&&a.memo || '';
-      setAI('upd', 'done', '読み取り完了！確認して「更新する」を押してください。');
-      document.getElementById('fa-upd').style.display = 'block';
+      document.getElementById('u-flw').value=json.followers||(a&&a.followers||'');
+      document.getElementById('u-posts').value=json.posts||(a&&a.posts||'');
+      document.getElementById('u-fling').value=json.following||(a&&a.following||'');
+      document.getElementById('u-bio').value=json.bio||(a&&a.bio||'');
+      document.getElementById('u-memo').value=(a&&a.memo)||'';
+      setAI('upd','done','読み取り完了！確認して更新してください。');
+      document.getElementById('fa-upd').style.display='block';
     });
   },
 
   saveUpd: function() {
-    var id = this._updId; if (!id) return;
-    var updated = {
-      followers: document.getElementById('u-flw').value.trim(),
-      posts:     document.getElementById('u-posts').value.trim(),
-      following: document.getElementById('u-fling').value.trim(),
-      bio:       document.getElementById('u-bio').value.trim(),
-      memo:      document.getElementById('u-memo').value.trim(),
-      updatedAt: new Date().toLocaleDateString('ja-JP'),
+    var id=this._updId; if(!id) return;
+    var updated={
+      followers:document.getElementById('u-flw').value.trim(),
+      posts:document.getElementById('u-posts').value.trim(),
+      following:document.getElementById('u-fling').value.trim(),
+      bio:document.getElementById('u-bio').value.trim(),
+      memo:document.getElementById('u-memo').value.trim(),
+      updatedAt:new Date().toLocaleDateString('ja-JP'),
     };
-    if (this._updB64) updated.imageB64 = this._updB64;
-    Data.update(id, updated);
+    if(this._updB64) updated.imageB64=this._updB64;
+    var idx=Data.list.findIndex(function(x){return x.id===id;});
+    if(idx>-1) Data.list[idx]=Object.assign({},Data.list[idx],updated);
     Modal.close('m-upd');
-    Render.all();
-    var a = Data.list.find(function(x){return x.id===id;});
-    Util.toast('@'+(a&&a.accountId||'')+' を更新しました');
+    GH.push(function(err){
+      var a=Data.list.find(function(x){return x.id===id;});
+      if(!err) Util.toast('@'+(a&&a.accountId||'')+' を更新しました');
+      else Util.toast('⚠️ GitHubへの保存に失敗：'+err.message);
+      Render.all();
+    });
   },
 
-  /* ---- DETAIL ---- */
   openDet: function(id) {
-    var a = Data.list.find(function(x){return x.id===id;}); if (!a) return;
-    var tags = (a.cats||[]).map(function(c) {
-      var info=CFG.CATS[c]; return info?'<span class="tag '+info.tag+'">'+info.label+'</span>':'';
-    }).join('');
-    var gTag   = a.genre ? '<span class="tag tag-genre">'+a.genre+'</span>' : '';
-    var imgEl  = a.imageB64 ? '<img class="det-img" src="'+a.imageB64+'" alt="'+(a.name||'')+'">' : '';
-    var statEl = (a.followers||a.posts||a.following) ?
-      '<div class="det-stats">' +
-      (a.followers?'<div class="ds"><div class="ds-n">'+a.followers+'</div><div class="ds-l">フォロワー</div></div>':'') +
-      (a.posts?'<div class="ds"><div class="ds-n">'+a.posts+'</div><div class="ds-l">投稿</div></div>':'') +
-      (a.following?'<div class="ds"><div class="ds-n">'+a.following+'</div><div class="ds-l">フォロー中</div></div>':'') +
-      '</div>' : '';
-    var bioEl  = a.bio  ? '<div class="det-bio">'+(a.bio||'').replace(/\n/g,'<br>')+'</div>' : '';
-    var memoEl = a.memo ? '<div class="det-memo">'+a.memo+'</div>' : '';
-    var upd    = (a.updatedAt&&a.updatedAt!==a.createdAt)?'　更新：'+a.updatedAt:'';
-    document.getElementById('m-det-in').innerHTML =
-      '<div class="mhandle"></div>' + imgEl +
-      '<div class="det-body">' +
-        '<div class="det-name">'+(a.name||'—')+'</div>' +
-        '<div class="det-id">@'+(a.accountId||'')+'</div>' +
-        statEl +
-        '<div class="det-tags">'+tags+gTag+'</div>' +
-        bioEl + memoEl +
-        '<div class="det-date">📅 登録：'+(a.createdAt||'—')+upd+'　v'+CFG.VER+'</div>' +
-        '<div class="det-acts">' +
-          '<a class="btn-ig" href="https://www.instagram.com/'+(a.accountId||'')+'/" target="_blank">Instagramを開く →</a>' +
-          '<button class="btn-ed" onclick="App.openEdit(\''+id+'\')">編集する</button>' +
-          '<button class="btn-dl" onclick="App.del(\''+id+'\')">このアカウントを削除する</button>' +
-        '</div>' +
+    var a=Data.list.find(function(x){return x.id===id;}); if(!a) return;
+    var tags=(a.cats||[]).map(function(c){var i=CFG.CATS[c];return i?'<span class="tag '+i.tag+'">'+i.label+'</span>':'';}).join('');
+    var gTag=a.genre?'<span class="tag tag-genre">'+a.genre+'</span>':'';
+    var imgEl=a.imageB64?'<img class="det-img" src="'+a.imageB64+'" alt="'+(a.name||'')+'">':'';
+    var stEl=(a.followers||a.posts||a.following)?
+      '<div class="det-stats">'+
+      (a.followers?'<div class="ds"><div class="ds-n">'+a.followers+'</div><div class="ds-l">フォロワー</div></div>':'')+
+      (a.posts?'<div class="ds"><div class="ds-n">'+a.posts+'</div><div class="ds-l">投稿</div></div>':'')+
+      (a.following?'<div class="ds"><div class="ds-n">'+a.following+'</div><div class="ds-l">フォロー中</div></div>':'')+
+      '</div>':'';
+    var bioEl=a.bio?'<div class="det-bio">'+(a.bio||'').replace(/\n/g,'<br>')+'</div>':'';
+    var memoEl=a.memo?'<div class="det-memo">'+a.memo+'</div>':'';
+    var upd=(a.updatedAt&&a.updatedAt!==a.createdAt)?'　更新：'+a.updatedAt:'';
+    var editBtn=Settings.hasGHToken()?'<button class="btn-ed" onclick="App.openEdit(\''+id+'\')">編集する</button>':'';
+    var delBtn=Settings.hasGHToken()?'<button class="btn-dl" onclick="App.del(\''+id+'\')">このアカウントを削除する</button>':'';
+    document.getElementById('m-det-in').innerHTML=
+      '<div class="mhandle"></div>'+imgEl+
+      '<div class="det-body">'+
+        '<div class="det-name">'+(a.name||'—')+'</div>'+
+        '<div class="det-id">@'+(a.accountId||'')+'</div>'+
+        stEl+'<div class="det-tags">'+tags+gTag+'</div>'+bioEl+memoEl+
+        '<div class="det-date">📅 登録：'+(a.createdAt||'—')+upd+'　v'+CFG.VER+'</div>'+
+        '<div class="det-acts">'+
+          '<a class="btn-ig" href="https://www.instagram.com/'+(a.accountId||'')+'/" target="_blank">Instagramを開く →</a>'+
+          editBtn+delBtn+
+        '</div>'+
       '</div>';
     Modal.open('m-det');
   },
 
   openEdit: function(id) {
-    var a = Data.list.find(function(x){return x.id===id;}); if (!a) return;
-    this._editId = id;
-    this._cats   = new Set(a.cats||[]);
-    this._imgB64 = a.imageB64||null;
-    document.getElementById('m-add-ttl').textContent = 'アカウントを編集';
-    this._resetAddForm();
-    var set = function(fid,v){var el=document.getElementById(fid);if(el&&v)el.value=v;};
-    set('f-id',a.accountId); set('f-name',a.name); set('f-posts',a.posts);
-    set('f-flw',a.followers); set('f-fling',a.following);
-    set('f-bio',a.bio); set('f-genre',a.genre); set('f-memo',a.memo);
-    (a.cats||[]).forEach(function(c){
-      var btn=document.getElementById('co-'+c); if(btn) btn.className='copt '+CFG.CATS[c].opt;
-    });
-    if (a.imageB64) {
-      document.getElementById('pi-add').src           = a.imageB64;
-      document.getElementById('uz-add').style.display = 'none';
-      document.getElementById('pw-add').style.display = 'block';
+    var a=Data.list.find(function(x){return x.id===id;}); if(!a) return;
+    this._editId=id; this._cats=new Set(a.cats||[]); this._imgB64=a.imageB64||null;
+    document.getElementById('m-add-ttl').textContent='アカウントを編集';
+    this._resetAdd();
+    var s=function(fid,v){var el=document.getElementById(fid);if(el&&v)el.value=v;};
+    s('f-id',a.accountId);s('f-name',a.name);s('f-posts',a.posts);
+    s('f-flw',a.followers);s('f-fling',a.following);s('f-bio',a.bio);s('f-genre',a.genre);s('f-memo',a.memo);
+    (a.cats||[]).forEach(function(c){var btn=document.getElementById('co-'+c);if(btn)btn.className='copt '+CFG.CATS[c].opt;});
+    if(a.imageB64){
+      document.getElementById('pi-add').src=a.imageB64;
+      document.getElementById('uz-add').style.display='none';
+      document.getElementById('pw-add').style.display='block';
     }
-    document.getElementById('fa-add').style.display = 'block';
+    document.getElementById('fa-add').style.display='block';
     Modal.close('m-det');
     Modal.open('m-add');
   },
 
   del: function(id) {
-    if (!confirm('このアカウントを削除しますか？')) return;
-    Data.del(id); Modal.close('m-det'); Render.all(); Util.toast('削除しました');
+    if(!confirm('このアカウントを削除しますか？')) return;
+    Data.list=Data.list.filter(function(x){return x.id!==id;});
+    Modal.close('m-det');
+    GH.push(function(err){
+      if(!err) Util.toast('削除しました');
+      else Util.toast('⚠️ GitHubへの保存に失敗：'+err.message);
+      Render.all();
+    });
   },
 };
 
@@ -868,15 +957,15 @@ var App = {
 ============================================================ */
 var Util = {
   toast: function(msg) {
-    var el = document.getElementById('toast');
-    el.textContent = msg; el.classList.add('show');
-    setTimeout(function(){ el.classList.remove('show'); }, 2500);
+    var el=document.getElementById('toast');
+    el.textContent=msg; el.classList.add('show');
+    setTimeout(function(){el.classList.remove('show');},2800);
   },
 };
 
 /* INIT */
-Data.load();
-Render.all();
+Render.syncStatus('loading','GitHubからデータを読み込み中...');
+GH.pull();
 </script>
 </body>
 </html>
