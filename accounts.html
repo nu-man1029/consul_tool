@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>参考アカウント管理 | ぬーまん × Venture Films</title>
+
+<!-- ============================================================
+  accounts.html  v1.0.0
+  ぬーまん × Venture Films コンサル 参考アカウント管理ツール
+
+  UPDATE LOG:
+  v1.0.0 (2026-03-16) 初期リリース
+
+  STRUCTURE:
+  - CONFIG  : バージョン・設定
+  - DATA    : データ管理（localStorage）
+  - RENDER  : 画面描画
+  - MODAL   : モーダル制御
+  - APP     : アプリロジック（追加・編集・削除）
+  - UTIL    : ユーティリティ
+============================================================ -->
+
+<style>
+/* ============================================================
+   CSS VARIABLES
+   カラー変更はここだけ修正すればOK
+============================================================ */
+:root {
+  --orange:        #f18200;
+  --orange-l:      #fff3e0;
+  --orange-m:      rgba(241,130,0,0.15);
+  --orange-bdr:    rgba(241,130,0,0.35);
+  --bg:            #f5f5f3;
+  --bg-card:       #ffffff;
+  --bg-sub:        #fafaf8;
+  --bg-input:      #f8f8f6;
+  --text:          #1a1a1a;
+  --text-sub:      #666666;
+  --text-hint:     #aaaaaa;
+  --border:        #e8e8e5;
+  --border-d:      #d0d0cc;
+  --red:           #e24b4a; --red-l:   #fce4ec; --red-bdr:    rgba(226,75,74,0.3);
+  --green:         #4caf50; --green-l: #e8f5e9; --green-bdr:  rgba(76,175,80,0.3);
+  --blue:          #1976d2; --blue-l:  #e3f2fd; --blue-bdr:   rgba(25,118,210,0.3);
+  --r:             16px;
+  --rs:            10px;
+  --rsm:           6px;
+  --shadow-sm:     0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md:     0 4px 12px rgba(0,0,0,0.10);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Helvetica Neue',Arial,'Hiragino Sans','Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;max-width:500px;margin:0 auto;-webkit-font-smoothing:antialiased}
+
+/* HEADER */
+.hdr{background:#fff;border-bottom:1px solid var(--border);padding:14px 16px 0;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm)}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.hdr-badge{display:inline-block;font-size:10px;font-weight:700;background:var(--orange-l);color:var(--orange);border:1px solid var(--orange-bdr);border-radius:20px;padding:2px 8px;margin-bottom:4px}
+.hdr-title{font-size:16px;font-weight:800;display:flex;align-items:center;gap:6px}
+.hdr-dot{width:8px;height:8px;border-radius:50%;background:var(--orange);flex-shrink:0}
+.hdr-sub{font-size:11px;color:var(--text-sub);margin-top:2px}
+.back-link{font-size:12px;font-weight:600;color:var(--text-sub);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--bg-sub);white-space:nowrap;flex-shrink:0;transition:all .15s}
+.back-link:hover{color:var(--orange);border-color:var(--orange-bdr)}
+.prog-bar{height:3px;background:var(--border);overflow:hidden}
+.prog-fill{height:100%;background:var(--orange);border-radius:0 2px 2px 0;transition:width .5s}
+
+/* FILTER */
+.filter-bar{padding:10px 16px;overflow-x:auto;display:flex;gap:6px;scrollbar-width:none;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:83px;z-index:99}
+.filter-bar::-webkit-scrollbar{display:none}
+.ftab{flex-shrink:0;padding:6px 13px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-sub);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:4px;transition:all .15s}
+.ftab.active{background:var(--orange);border-color:var(--orange);color:#fff}
+.ftab:not(.active):hover{border-color:var(--orange-bdr);color:var(--orange)}
+.f-cnt{font-size:10px;background:rgba(0,0,0,0.08);border-radius:10px;padding:1px 5px;font-weight:700}
+.ftab.active .f-cnt{background:rgba(255,255,255,0.25)}
+
+/* CONTENT */
+.content{padding:14px 16px}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center;box-shadow:var(--shadow-sm)}
+.stat-n{font-size:22px;font-weight:800;color:var(--orange)}
+.stat-l{font-size:10px;color:var(--text-sub);margin-top:2px;font-weight:500}
+.add-btn{width:100%;padding:14px;border-radius:var(--r);border:2px dashed var(--orange-bdr);background:var(--orange-l);color:var(--orange);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:14px;transition:all .2s}
+.add-btn:hover{background:var(--orange-m);border-color:var(--orange)}
+.add-ico{font-size:20px;line-height:1}
+
+/* CARDS */
+.cards{display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
+.acard{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow-sm);transition:box-shadow .15s,border-color .15s}
+.acard:hover{box-shadow:var(--shadow-md)}
+.acard-img{width:100%;max-height:220px;object-fit:cover;object-position:top;display:block;border-bottom:1px solid var(--border);background:var(--bg-sub)}
+.acard-body{padding:14px}
+.acard-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+.acard-av{width:46px;height:46px;border-radius:50%;border:2px solid var(--border);background:var(--bg-sub);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:18px}
+.acard-av img{width:100%;height:100%;object-fit:cover}
+.acard-info{flex:1;min-width:0}
+.acard-name{font-size:14px;font-weight:800;line-height:1.3}
+.acard-id{font-size:12px;color:var(--orange);font-weight:600;margin-top:1px}
+.acard-stats{display:flex;gap:0;margin-top:8px;background:var(--bg-sub);border:1px solid var(--border);border-radius:var(--rsm);overflow:hidden}
+.ast{flex:1;padding:8px 6px;text-align:center;border-right:1px solid var(--border)}
+.ast:last-child{border-right:none}
+.ast-n{font-size:13px;font-weight:700}
+.ast-l{font-size:10px;color:var(--text-sub)}
+.acard-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.tag{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px}
+.tag-rival {background:var(--red-l);  color:var(--red);  border:1px solid var(--red-bdr)}
+.tag-ref   {background:var(--blue-l); color:var(--blue); border:1px solid var(--blue-bdr)}
+.tag-goal  {background:var(--green-l);color:var(--green);border:1px solid var(--green-bdr)}
+.tag-takano{background:var(--orange-l);color:var(--orange);border:1px solid var(--orange-bdr)}
+.tag-genre {background:var(--bg-sub);color:var(--text-sub);border:1px solid var(--border)}
+.acard-bio{font-size:12px;color:var(--text-sub);line-height:1.65;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.acard-memo{margin-top:8px;padding:8px 10px;background:var(--orange-l);border-left:3px solid var(--orange);border-radius:0 var(--rsm) var(--rsm) 0;font-size:12px;color:var(--text-sub);font-style:italic;line-height:1.5}
+.acard-acts{display:flex;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+.acard-act{flex:1;padding:9px 8px;border-radius:var(--rsm);border:1px solid var(--border);background:var(--bg-sub);color:var(--text-sub);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:center;transition:all .15s;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:4px}
+.acard-act:hover{background:var(--bg);color:var(--text)}
+.acard-act.primary{background:var(--orange);border-color:var(--orange);color:#fff}
+.acard-act.primary:hover{background:#d97200}
+
+/* EMPTY */
+.empty{text-align:center;padding:48px 24px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow-sm)}
+.empty-ico{font-size:48px;margin-bottom:12px}
+.empty-ttl{font-size:15px;font-weight:700;margin-bottom:6px}
+.empty-sub{font-size:13px;color:var(--text-sub);line-height:1.6}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
+.overlay.open{display:flex}
+.modal{background:var(--bg-card);border-radius:var(--r) var(--r) 0 0;width:100%;max-width:500px;max-height:93vh;overflow-y:auto;animation:slideUp .2s ease}
+@keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 0}
+.modal-hdr{padding:16px 20px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-card);z-index:10}
+.modal-title{font-size:16px;font-weight:800}
+.modal-sub{font-size:12px;color:var(--text-sub);margin-top:3px;line-height:1.6}
+.modal-body{padding:16px 20px 40px}
+
+/* UPLOAD */
+.upload-zone{border:2px dashed var(--border-d);border-radius:var(--rs);padding:28px 20px;text-align:center;cursor:pointer;position:relative;overflow:hidden;transition:all .2s;background:var(--bg-sub);margin-bottom:14px}
+.upload-zone:hover,.upload-zone.on{border-color:var(--orange);background:var(--orange-l)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+.upload-ico{font-size:40px;margin-bottom:8px}
+.upload-ttl{font-size:14px;font-weight:700;margin-bottom:4px}
+.upload-sub{font-size:12px;color:var(--text-sub)}
+.preview-wrap{display:none;position:relative;margin-bottom:14px}
+.preview-img{width:100%;max-height:280px;object-fit:contain;border-radius:var(--rs);border:1px solid var(--border);background:var(--bg-sub);display:block}
+.preview-change{position:absolute;top:8px;right:8px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:var(--rsm);border:1px solid var(--border);background:rgba(255,255,255,0.92);color:var(--text-sub);cursor:pointer}
+
+/* AI BAR */
+.ai-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg-sub);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:14px}
+.ai-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--text-hint)}
+.ai-dot.loading{background:var(--orange);animation:blink 1s infinite}
+.ai-dot.done{background:var(--green)}
+.ai-dot.error{background:var(--red)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.ai-txt{font-size:12px;color:var(--text-sub);font-weight:500}
+
+/* FORM */
+.fsec-title{font-size:11px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.frow3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.fg{margin-bottom:10px}
+.fg label{display:block;font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:4px;letter-spacing:.3px}
+.fg input,.fg select,.fg textarea{width:100%;font-size:13px;padding:9px 11px;border:1px solid var(--border-d);border-radius:var(--rsm);background:var(--bg-input);color:var(--text);font-family:inherit;transition:border-color .15s}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--orange);background:#fff}
+.fg textarea{resize:vertical;min-height:72px;line-height:1.6}
+.cat-label{font-size:11px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px;display:block}
+.cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:14px}
+.cat-opt{padding:10px;border:1.5px solid var(--border);border-radius:var(--rs);background:var(--bg-sub);color:var(--text-sub);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left;transition:all .15s;line-height:1.4}
+.cat-opt .ce{font-size:15px;display:block;margin-bottom:3px}
+.cat-opt .cd{font-size:10px;font-weight:400;display:block;margin-top:2px}
+.cat-opt.s-rival {border-color:var(--red);  background:var(--red-l);  color:var(--red)}
+.cat-opt.s-ref   {border-color:var(--blue);background:var(--blue-l);color:var(--blue)}
+.cat-opt.s-goal  {border-color:var(--green);background:var(--green-l);color:var(--green)}
+.cat-opt.s-takano{border-color:var(--orange);background:var(--orange-l);color:var(--orange)}
+.btn-primary{width:100%;padding:14px;border-radius:var(--r);border:none;background:var(--orange);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;transition:background .15s;margin-top:8px}
+.btn-primary:hover{background:#d97200}
+.btn-primary:disabled{background:var(--text-hint);cursor:not-allowed}
+.btn-cancel{width:100%;padding:12px;border-radius:var(--r);border:1px solid var(--border);background:transparent;color:var(--text-sub);font-size:14px;cursor:pointer;font-family:inherit;margin-top:8px}
+
+/* DETAIL */
+.det-img{width:100%;max-height:260px;object-fit:contain;object-position:top;display:block;background:var(--bg-sub);border-bottom:1px solid var(--border)}
+.det-body{padding:18px 20px 40px}
+.det-name{font-size:20px;font-weight:900}
+.det-id{font-size:13px;color:var(--orange);font-weight:700;margin-top:2px}
+.det-stats{display:flex;gap:0;margin:14px 0;background:var(--bg-sub);border:1px solid var(--border);border-radius:var(--rs);overflow:hidden}
+.ds{flex:1;padding:12px 8px;text-align:center;border-right:1px solid var(--border)}
+.ds:last-child{border-right:none}
+.ds-n{font-size:16px;font-weight:800}
+.ds-l{font-size:10px;color:var(--text-sub);margin-top:2px}
+.det-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.det-bio{font-size:13px;color:var(--text-sub);line-height:1.75;margin-bottom:14px;padding:12px;background:var(--bg-sub);border-radius:var(--rs);border:1px solid var(--border)}
+.det-memo{padding:12px;background:var(--orange-l);border-left:3px solid var(--orange);border-radius:0 var(--rs) var(--rs) 0;font-size:13px;color:var(--text-sub);line-height:1.65;margin-bottom:14px}
+.det-meta{font-size:11px;color:var(--text-hint);margin-bottom:16px}
+.det-acts{display:flex;flex-direction:column;gap:8px}
+.btn-ig{display:block;width:100%;padding:14px;border-radius:var(--r);background:var(--orange);color:#fff;font-size:15px;font-weight:800;text-align:center;text-decoration:none;cursor:pointer;border:none;font-family:inherit;transition:background .15s}
+.btn-ig:hover{background:#d97200}
+.btn-edit{width:100%;padding:12px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg-sub);color:var(--text-sub);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-del{width:100%;padding:12px;border-radius:var(--r);border:1px solid var(--red-bdr);background:var(--red-l);color:var(--red);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+
+/* TOAST */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(16px);background:#1a1a1a;color:#fff;font-size:13px;font-weight:500;padding:10px 20px;border-radius:20px;z-index:9999;opacity:0;pointer-events:none;transition:all .25s;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.2)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:360px){
+  .cat-grid{grid-template-columns:1fr}
+  .frow3{grid-template-columns:1fr 1fr}
+  .stats-row{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-top">
+    <div>
+      <div class="hdr-badge">ぬーまん × Venture Films</div>
+      <div class="hdr-title"><div class="hdr-dot"></div>参考アカウント管理</div>
+      <div class="hdr-sub">スクショをAIが自動で読み取ります</div>
+    </div>
+    <a href="index.html" class="back-link">← タスク管理</a>
+  </div>
+  <div class="prog-bar"><div class="prog-fill" id="prog-fill"></div></div>
+</header>
+
+<div class="filter-bar" id="filter-bar"></div>
+
+<div class="content">
+  <div class="stats-row" id="stats-row"></div>
+  <button class="add-btn" onclick="App.openAdd()"><span class="add-ico">📸</span>スクショを追加する</button>
+  <div class="cards" id="cards"></div>
+</div>
+
+<!-- ADD / EDIT MODAL -->
+<div class="overlay" id="add-modal" onclick="Modal.bg(event,'add-modal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr">
+      <div class="modal-title" id="modal-title">アカウントを追加</div>
+      <div class="modal-sub">Instagramプロフィールのスクショを選択するとAIが自動で読み取ります。</div>
+    </div>
+    <div class="modal-body">
+      <div class="upload-zone" id="upload-zone" ondragover="App.dOver(event)" ondragleave="App.dLeave(event)" ondrop="App.dDrop(event)">
+        <input type="file" accept="image/*" id="file-inp" onchange="App.fileSelected(event)">
+        <div class="upload-ico">📸</div>
+        <div class="upload-ttl">スクショをタップして選択</div>
+        <div class="upload-sub">またはドラッグ＆ドロップ</div>
+      </div>
+      <div class="preview-wrap" id="preview-wrap">
+        <img class="preview-img" id="preview-img" alt="">
+        <button class="preview-change" onclick="App.resetUpload()">変更する</button>
+      </div>
+      <div class="ai-bar" id="ai-bar" style="display:none">
+        <div class="ai-dot" id="ai-dot"></div>
+        <div class="ai-txt" id="ai-txt">待機中</div>
+      </div>
+      <div id="form-area" style="display:none">
+        <div class="fsec-title">基本情報</div>
+        <div class="frow">
+          <div class="fg"><label>@ アカウントID *</label><input id="f-id" placeholder="cement_prince"></div>
+          <div class="fg"><label>表示名 *</label><input id="f-name" placeholder="セメント王子"></div>
+        </div>
+        <div class="frow3">
+          <div class="fg"><label>投稿数</label><input id="f-posts" placeholder="138"></div>
+          <div class="fg"><label>フォロワー</label><input id="f-followers" placeholder="2.2万"></div>
+          <div class="fg"><label>フォロー中</label><input id="f-following" placeholder="838"></div>
+        </div>
+        <div class="fg"><label>プロフィール文</label><textarea id="f-bio" placeholder="プロフィール文（AIが自動入力）"></textarea></div>
+        <div class="fg"><label>ジャンル</label><input id="f-genre" placeholder="例：建築・リフォーム"></div>
+        <div class="fsec-title">カテゴリ（複数選択可）</div>
+        <div class="cat-grid">
+          <button class="cat-opt" id="cat-rival"  onclick="App.toggleCat('rival')"><span class="ce">🥊</span>競合<span class="cd">同ジャンルのライバル</span></button>
+          <button class="cat-opt" id="cat-ref"    onclick="App.toggleCat('ref')"><span class="ce">📚</span>参考<span class="cd">手法・構成を学ぶ</span></button>
+          <button class="cat-opt" id="cat-goal"   onclick="App.toggleCat('goal')"><span class="ce">🎯</span>目標<span class="cd">なりたい姿</span></button>
+          <button class="cat-opt" id="cat-takano" onclick="App.toggleCat('takano')"><span class="ce">⭐</span>高野さん推薦<span class="cd">コンサルで紹介</span></button>
+        </div>
+        <div class="fsec-title">メモ</div>
+        <div class="fg"><label>学べるポイント・メモ</label><textarea id="f-memo" placeholder="例：サムネ統一が秀逸。キレ始まりの構成が参考になる。"></textarea></div>
+        <button class="btn-primary" onclick="App.save()">登録する</button>
+        <button class="btn-cancel" onclick="Modal.close('add-modal')">キャンセル</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="overlay" id="det-modal" onclick="Modal.bg(event,'det-modal')">
+  <div class="modal" id="det-inner"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   CONFIG
+============================================================ */
+const CONFIG = {
+  VERSION:    '1.0.0',
+  STORAGE:    'nu_accounts_v1',
+  API_MODEL:  'claude-sonnet-4-20250514',
+  MAX_TOKENS: 1200,
+  CATS: {
+    rival:  { label:'競合',        tag:'tag-rival',  opt:'s-rival'  },
+    ref:    { label:'参考',        tag:'tag-ref',    opt:'s-ref'    },
+    goal:   { label:'目標',        tag:'tag-goal',   opt:'s-goal'   },
+    takano: { label:'高野さん推薦', tag:'tag-takano', opt:'s-takano' },
+  },
+  FILTERS: [
+    {id:'all',label:'すべて'},{id:'rival',label:'競合'},{id:'ref',label:'参考'},
+    {id:'goal',label:'目標'},{id:'takano',label:'高野さん推薦'},
+  ],
+  AI_PROMPT:`このInstagramプロフィールのスクリーンショットから情報を抽出してください。
+必ずJSON形式のみで返してください。他のテキストは一切含めないでください。
+{
+  "accountId":"アカウントID（@なし）",
+  "name":"表示名",
+  "posts":"投稿数（数字）",
+  "followers":"フォロワー数（例：2.2万）",
+  "following":"フォロー中の数",
+  "bio":"プロフィール文全文",
+  "genre":"ジャンル推定（日本語、例：建築・リフォーム）",
+  "category_suggestion":"rival/ref/goalのどれか1つ"
+}`,
+};
+
+/* ============================================================
+   DATA
+============================================================ */
+const Data = {
+  list: [],
+  load() {
+    try { const d = localStorage.getItem(CONFIG.STORAGE); if (d) this.list = JSON.parse(d); } catch(e) {}
+    if (!this.list.length) this._sample();
+  },
+  save() { try { localStorage.setItem(CONFIG.STORAGE, JSON.stringify(this.list)); } catch(e) {} },
+  add(a)    { this.list.unshift(a); this.save(); },
+  update(id, a) {
+    const i = this.list.findIndex(x => x.id === id);
+    if (i > -1) { this.list[i] = {...this.list[i], ...a}; this.save(); }
+  },
+  del(id)   { this.list = this.list.filter(x => x.id !== id); this.save(); },
+  filtered(f) { return f === 'all' ? this.list : this.list.filter(a => (a.cats||[]).includes(f)); },
+  cnt(f)    { return f === 'all' ? this.list.length : this.list.filter(a => (a.cats||[]).includes(f)).length; },
+  _sample() {
+    this.list = [
+      { id:'s1', accountId:'cement_prince', name:'セメント王子', posts:'138', followers:'2.2万', following:'838',
+        bio:'建築デザイナー\nセメントパワーで壊さず映えリフォームをしている✨ リフォーム最強の王子👑\n床、壁リフォームするのに俺知らないとお金損しますよ？',
+        genre:'建築・リフォーム', cats:['rival','goal'], imageB64:null,
+        memo:'同ジャンルの最強ライバル。2.2万フォロワー。プロフィール文のキャッチーさ・共同投稿候補。', createdAt:'2026/3/16' },
+      { id:'s2', accountId:'vegetable.change', name:'ベジチェンすみ：野菜が好きになる家庭菜園研究家', posts:'1202', followers:'1.1万', following:'558',
+        bio:'畑も料理も。初めてさん大歓迎！\n育てて・食べて・全国の仲間とつながる「ベジとも」コミュニティ',
+        genre:'農業・家庭菜園', cats:['ref','takano'], imageB64:null,
+        memo:'高野さん推薦。半年で1万人達成。構成・話し方・サムネ統一・キレ始まりが秀逸。', createdAt:'2026/3/16' },
+    ];
+    this.save();
+  },
+};
+
+/* ============================================================
+   RENDER
+============================================================ */
+const Render = {
+  filter: 'all',
+  setFilter(f) { this.filter = f; this.all(); },
+  all() { this.tabs(); this.stats(); this.cards(); this.progress(); },
+  tabs() {
+    document.getElementById('filter-bar').innerHTML = CONFIG.FILTERS.map(f => {
+      const a = this.filter === f.id ? ' active' : '';
+      return `<button class="ftab${a}" onclick="Render.setFilter('${f.id}')">${f.label}<span class="f-cnt">${Data.cnt(f.id)}</span></button>`;
+    }).join('');
+  },
+  stats() {
+    document.getElementById('stats-row').innerHTML = `
+      <div class="stat-card"><div class="stat-n">${Data.list.length}</div><div class="stat-l">登録総数</div></div>
+      <div class="stat-card"><div class="stat-n">${Data.cnt('rival')}</div><div class="stat-l">競合</div></div>
+      <div class="stat-card"><div class="stat-n">${Data.cnt('goal')}</div><div class="stat-l">目標</div></div>`;
+  },
+  cards() {
+    const el = document.getElementById('cards');
+    const list = Data.filtered(this.filter);
+    if (!list.length) {
+      el.innerHTML = `<div class="empty"><div class="empty-ico">📱</div><div class="empty-ttl">アカウントがまだありません</div><div class="empty-sub">「スクショを追加する」から<br>プロフィール画像を登録してください</div></div>`;
+      return;
+    }
+    el.innerHTML = list.map(a => this._card(a)).join('');
+  },
+  _card(a) {
+    const tags = (a.cats||[]).map(c => `<span class="tag ${CONFIG.CATS[c]?.tag||''}">${CONFIG.CATS[c]?.label||c}</span>`).join('');
+    const gTag = a.genre ? `<span class="tag tag-genre">${a.genre}</span>` : '';
+    const imgEl = a.imageB64 ? `<img class="acard-img" src="${a.imageB64}" alt="${a.name}" loading="lazy">` : '';
+    return `<div class="acard">
+      ${imgEl}
+      <div class="acard-body">
+        <div class="acard-row">
+          <div class="acard-av">📷</div>
+          <div class="acard-info">
+            <div class="acard-name">${a.name||'—'}</div>
+            <div class="acard-id">@${a.accountId||''}</div>
+          </div>
+        </div>
+        ${(a.followers||a.posts||a.following)?`<div class="acard-stats">
+          ${a.followers?`<div class="ast"><div class="ast-n">${a.followers}</div><div class="ast-l">フォロワー</div></div>`:''}
+          ${a.posts?`<div class="ast"><div class="ast-n">${a.posts}</div><div class="ast-l">投稿</div></div>`:''}
+          ${a.following?`<div class="ast"><div class="ast-n">${a.following}</div><div class="ast-l">フォロー中</div></div>`:''}
+        </div>`:''}
+        <div class="acard-tags">${tags}${gTag}</div>
+        ${a.bio?`<div class="acard-bio">${a.bio.replace(/\n/g,'　')}</div>`:''}
+        ${a.memo?`<div class="acard-memo">${a.memo}</div>`:''}
+        <div class="acard-acts">
+          <button class="acard-act" onclick="App.openDetail('${a.id}')">詳細を見る</button>
+          <a class="acard-act primary" href="https://www.instagram.com/${a.accountId}/" target="_blank">Instagramを開く →</a>
+        </div>
+      </div>
+    </div>`;
+  },
+  progress() {
+    const g = Data.cnt('goal'), all = Data.list.length;
+    document.getElementById('prog-fill').style.width = all ? Math.round(g/all*100)+'%' : '0%';
+  },
+};
+
+/* ============================================================
+   MODAL
+============================================================ */
+const Modal = {
+  open(id)  { document.getElementById(id).classList.add('open'); },
+  close(id) { document.getElementById(id).classList.remove('open'); },
+  bg(e, id) { if (e.target === document.getElementById(id)) this.close(id); },
+};
+
+/* ============================================================
+   APP
+============================================================ */
+const App = {
+  _editId:  null,
+  _cats:    new Set(),
+  _imgB64:  null,
+
+  openAdd() {
+    this._editId = null; this._cats = new Set(); this._imgB64 = null;
+    document.getElementById('modal-title').textContent = 'アカウントを追加';
+    this._resetForm();
+    Modal.open('add-modal');
+  },
+
+  _resetForm() {
+    ['f-id','f-name','f-posts','f-followers','f-following','f-bio','f-genre','f-memo']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['rival','ref','goal','takano'].forEach(c => { document.getElementById('cat-'+c).className = 'cat-opt'; });
+    document.getElementById('upload-zone').style.display  = 'block';
+    document.getElementById('preview-wrap').style.display = 'none';
+    document.getElementById('ai-bar').style.display       = 'none';
+    document.getElementById('form-area').style.display    = 'none';
+    document.getElementById('file-inp').value = '';
+  },
+
+  resetUpload() {
+    this._imgB64 = null;
+    document.getElementById('upload-zone').style.display  = 'block';
+    document.getElementById('preview-wrap').style.display = 'none';
+    document.getElementById('ai-bar').style.display       = 'none';
+    document.getElementById('form-area').style.display    = 'none';
+    document.getElementById('file-inp').value = '';
+  },
+
+  dOver(e)  { e.preventDefault(); document.getElementById('upload-zone').classList.add('on'); },
+  dLeave(e) { document.getElementById('upload-zone').classList.remove('on'); },
+  dDrop(e)  { e.preventDefault(); this.dLeave(e); const f = e.dataTransfer.files[0]; if (f) this._process(f); },
+  fileSelected(e) { const f = e.target.files[0]; if (f) this._process(f); },
+
+  _process(file) {
+    const r = new FileReader();
+    r.onload = ev => {
+      this._imgB64 = ev.target.result;
+      document.getElementById('preview-img').src         = this._imgB64;
+      document.getElementById('upload-zone').style.display  = 'none';
+      document.getElementById('preview-wrap').style.display = 'block';
+      document.getElementById('ai-bar').style.display       = 'flex';
+      this._setAI('loading', 'AIがプロフィールを読み取り中...');
+      this._analyze(this._imgB64.split(',')[1]);
+    };
+    r.readAsDataURL(file);
+  },
+
+  _setAI(state, msg) {
+    document.getElementById('ai-dot').className = 'ai-dot ' + state;
+    document.getElementById('ai-txt').textContent = msg;
+  },
+
+  async _analyze(b64) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: CONFIG.API_MODEL, max_tokens: CONFIG.MAX_TOKENS,
+          messages: [{ role: 'user', content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
+            { type: 'text', text: CONFIG.AI_PROMPT },
+          ]}],
+        }),
+      });
+      const d = await res.json();
+      const json = JSON.parse(d.content[0].text.replace(/```json|```/g,'').trim());
+      const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+      set('f-id',        json.accountId);
+      set('f-name',      json.name);
+      set('f-posts',     json.posts);
+      set('f-followers', json.followers);
+      set('f-following', json.following);
+      set('f-bio',       json.bio);
+      set('f-genre',     json.genre);
+      if (['rival','ref','goal'].includes(json.category_suggestion)) this.toggleCat(json.category_suggestion);
+      this._setAI('done', '読み取り完了！内容を確認して登録してください。');
+      document.getElementById('form-area').style.display = 'block';
+    } catch(e) {
+      this._setAI('error', '読み取りに失敗しました。手動で入力してください。');
+      document.getElementById('form-area').style.display = 'block';
+    }
+  },
+
+  toggleCat(c) {
+    const btn = document.getElementById('cat-'+c);
+    if (this._cats.has(c)) { this._cats.delete(c); btn.className = 'cat-opt'; }
+    else { this._cats.add(c); btn.className = 'cat-opt ' + CONFIG.CATS[c].opt; }
+  },
+
+  save() {
+    const id = document.getElementById('f-id').value.trim();
+    if (!id) { Util.toast('アカウントIDを入力してください'); return; }
+    const a = {
+      id:        this._editId || ('a_' + Date.now()),
+      accountId: id,
+      name:      document.getElementById('f-name').value.trim() || id,
+      posts:     document.getElementById('f-posts').value.trim(),
+      followers: document.getElementById('f-followers').value.trim(),
+      following: document.getElementById('f-following').value.trim(),
+      bio:       document.getElementById('f-bio').value.trim(),
+      genre:     document.getElementById('f-genre').value.trim(),
+      cats:      [...this._cats],
+      memo:      document.getElementById('f-memo').value.trim(),
+      imageB64:  this._imgB64,
+      createdAt: new Date().toLocaleDateString('ja-JP'),
+      updatedAt: new Date().toLocaleDateString('ja-JP'),
+    };
+    if (this._editId) { Data.update(this._editId, a); Util.toast('@'+id+' を更新しました'); }
+    else { Data.add(a); Util.toast('@'+id+' を登録しました'); }
+    Modal.close('add-modal');
+    Render.all();
+  },
+
+  openDetail(id) {
+    const a = Data.list.find(x => x.id === id); if (!a) return;
+    const tags = (a.cats||[]).map(c => `<span class="tag ${CONFIG.CATS[c]?.tag||''}">${CONFIG.CATS[c]?.label||c}</span>`).join('');
+    const gTag = a.genre ? `<span class="tag tag-genre">${a.genre}</span>` : '';
+    const imgEl = a.imageB64 ? `<img class="det-img" src="${a.imageB64}" alt="${a.name}">` : '';
+    document.getElementById('det-inner').innerHTML = `
+      <div class="modal-handle"></div>
+      ${imgEl}
+      <div class="det-body">
+        <div class="det-name">${a.name||'—'}</div>
+        <div class="det-id">@${a.accountId}</div>
+        ${(a.followers||a.posts||a.following)?`<div class="det-stats">
+          ${a.followers?`<div class="ds"><div class="ds-n">${a.followers}</div><div class="ds-l">フォロワー</div></div>`:''}
+          ${a.posts?`<div class="ds"><div class="ds-n">${a.posts}</div><div class="ds-l">投稿</div></div>`:''}
+          ${a.following?`<div class="ds"><div class="ds-n">${a.following}</div><div class="ds-l">フォロー中</div></div>`:''}
+        </div>`:''}
+        <div class="det-tags">${tags}${gTag}</div>
+        ${a.bio?`<div class="det-bio">${a.bio.replace(/\n/g,'<br>')}</div>`:''}
+        ${a.memo?`<div class="det-memo">${a.memo}</div>`:''}
+        <div class="det-meta">登録日：${a.createdAt||''}　v${CONFIG.VERSION}</div>
+        <div class="det-acts">
+          <a class="btn-ig" href="https://www.instagram.com/${a.accountId}/" target="_blank">Instagramを開く →</a>
+          <button class="btn-edit" onclick="App.openEdit('${a.id}')">編集する</button>
+          <button class="btn-del" onclick="App.del('${a.id}')">このアカウントを削除する</button>
+        </div>
+      </div>`;
+    Modal.open('det-modal');
+  },
+
+  openEdit(id) {
+    const a = Data.list.find(x => x.id === id); if (!a) return;
+    this._editId = id; this._cats = new Set(a.cats||[]); this._imgB64 = a.imageB64 || null;
+    document.getElementById('modal-title').textContent = 'アカウントを編集';
+    this._resetForm();
+    const set = (fid, v) => { const el = document.getElementById(fid); if (el && v) el.value = v; };
+    set('f-id',a.accountId); set('f-name',a.name); set('f-posts',a.posts);
+    set('f-followers',a.followers); set('f-following',a.following);
+    set('f-bio',a.bio); set('f-genre',a.genre); set('f-memo',a.memo);
+    (a.cats||[]).forEach(c => { document.getElementById('cat-'+c).className = 'cat-opt ' + CONFIG.CATS[c].opt; });
+    if (a.imageB64) {
+      document.getElementById('preview-img').src         = a.imageB64;
+      document.getElementById('upload-zone').style.display  = 'none';
+      document.getElementById('preview-wrap').style.display = 'block';
+    }
+    document.getElementById('form-area').style.display = 'block';
+    Modal.close('det-modal');
+    Modal.open('add-modal');
+  },
+
+  del(id) {
+    if (!confirm('このアカウントを削除しますか？')) return;
+    Data.del(id); Modal.close('det-modal'); Render.all(); Util.toast('削除しました');
+  },
+};
+
+/* ============================================================
+   UTIL
+============================================================ */
+const Util = {
+  toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2500);
+  },
+};
+
+/* INIT */
+Data.load();
+Render.all();
+</script>
+</body>
+</html>
