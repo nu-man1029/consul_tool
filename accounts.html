@@ -505,7 +505,7 @@ var GH = {
       .then(function(d) {
         if (!d.content) throw new Error('ファイルが見つかりません');
         GH._sha = d.sha;
-        var json = JSON.parse(atob(d.content.replace(/\n/g, '')));
+        var json = JSON.parse(decodeURIComponent(escape(atob(d.content.replace(/\n/g, '')))));
         Data.list = json.accounts || [];
         var now = new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
         Render.syncStatus('ok', '同期済み', now);
