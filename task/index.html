@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ぬーまん × Venture Films コンサル管理ツール</title>
+<style>
+:root{
+  --orange:#f18200;--orange-l:#fff3e0;--orange-m:#ffb347;
+  --bg:#f4f4f2;--card:#fff;--text:#1a1a1a;--sub:#666;--hint:#aaa;
+  --border:#e0e0e0;--border-d:#ccc;
+  --green:#4caf50;--green-l:#e8f5e9;--green-d:#2e7d32;
+  --red:#e24b4a;--red-l:#fce4ec;--red-d:#880e4f;
+  --blue:#1976d2;--blue-l:#e3f2fd;--blue-d:#0d47a1;
+  --r:10px;--rs:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.app{max-width:880px;margin:0 auto;padding-bottom:80px}
+
+/* HEADER */
+.hdr{background:var(--orange);padding:16px 20px;position:sticky;top:0;z-index:200}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.hdr-title{font-size:16px;font-weight:700;color:#fff}
+.hdr-sub{font-size:11px;color:rgba(255,255,255,0.8);margin-top:2px}
+.hdr-btns{display:flex;gap:7px;flex-shrink:0}
+.hdr-btn{font-size:12px;padding:5px 11px;border-radius:var(--rs);border:1.5px solid rgba(255,255,255,0.6);background:transparent;color:#fff;cursor:pointer;font-weight:600;white-space:nowrap}
+.hdr-btn:hover{background:rgba(255,255,255,0.15)}
+.hdr-btn.import-btn{background:rgba(255,255,255,0.2)}
+.gbar{height:4px;background:rgba(255,255,255,0.25);border-radius:2px;margin-top:10px;overflow:hidden}
+.gbar-f{height:100%;background:#fff;border-radius:2px;transition:width .4s}
+
+/* MODE BANNER */
+.mode-banner{padding:10px 20px;font-size:13px;font-weight:600;display:none;align-items:center;gap:10px;flex-wrap:wrap}
+.mode-banner.review{background:#e3f2fd;color:#0d47a1;display:flex}
+.mode-banner.merged{background:#e8f5e9;color:#2e7d32;display:flex}
+.mode-banner button{font-size:12px;padding:4px 10px;border-radius:var(--rs);border:1.5px solid currentColor;background:transparent;color:inherit;cursor:pointer;font-weight:600;margin-left:auto}
+
+/* TABS */
+.tabs{display:flex;overflow-x:auto;background:#fff;border-bottom:1px solid var(--border);padding:0 8px;position:sticky;top:72px;z-index:199}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex-shrink:0;padding:11px 14px;font-size:13px;font-weight:500;color:var(--sub);border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:5px;transition:color .15s,border-color .15s}
+.tab.active{color:var(--orange);border-bottom-color:var(--orange)}
+.tab-badge{font-size:10px;background:var(--border);color:var(--sub);border-radius:20px;padding:1px 6px;font-weight:600}
+.tab.active .tab-badge{background:var(--orange-l);color:var(--orange)}
+
+/* CONTENT */
+.content{padding:14px 14px 0}
+
+/* OVERVIEW */
+.ov-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.ov-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center}
+.ov-num{font-size:26px;font-weight:700;color:var(--orange)}
+.ov-label{font-size:12px;color:var(--sub);margin-top:2px}
+.sess-list{display:flex;flex-direction:column;gap:8px}
+.sl-item{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:13px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color .15s}
+.sl-item:hover{border-color:var(--orange)}
+.sl-num{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0}
+.sl-num.s-done{background:var(--green-l);color:var(--green-d)}
+.sl-num.s-active{background:var(--orange);color:#fff}
+.sl-num.s-future{background:var(--border);color:var(--hint)}
+.sl-body{flex:1;min-width:0}
+.sl-title{font-size:14px;font-weight:600}
+.sl-sub{font-size:12px;color:var(--sub);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sl-bar{height:4px;background:var(--bg);border-radius:2px;margin-top:8px;overflow:hidden}
+.sl-bar-f{height:100%;background:var(--orange);border-radius:2px}
+.sl-pct{font-size:13px;font-weight:700;color:var(--orange);flex-shrink:0}
+
+/* SESSION VIEW */
+.sess-hdr{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:15px 18px;margin-bottom:12px}
+.sess-hdr-title{font-size:15px;font-weight:700}
+.sess-hdr-meta{font-size:12px;color:var(--sub);margin-top:4px;display:flex;gap:12px;flex-wrap:wrap}
+.status-tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px}
+.st-done{background:var(--green-l);color:var(--green-d)}
+.st-active{background:var(--orange-l);color:var(--orange)}
+.st-future{background:var(--border);color:var(--hint)}
+.sess-stats{display:flex;gap:20px;margin-top:10px}
+.ss-n{font-size:20px;font-weight:700;color:var(--orange)}
+.ss-l{font-size:11px;color:var(--sub)}
+.sess-pbar{height:5px;background:var(--bg);border-radius:3px;margin-top:10px;overflow:hidden}
+.sess-pbar-f{height:100%;background:var(--orange);border-radius:3px;transition:width .4s}
+
+/* SECTIONS */
+.section{margin-bottom:12px}
+.sec-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.sec-name{font-size:13px;font-weight:600}
+.cat-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px}
+.cb-hw{background:var(--red-l);color:var(--red-d)}
+.cb-daily{background:var(--green-l);color:var(--green-d)}
+.cb-urgent{background:var(--orange-l);color:#b35a00}
+.cb-prep{background:var(--blue-l);color:var(--blue-d)}
+.cb-other{background:#f3e5f5;color:#6a1b9a}
+.sec-count{margin-left:auto;font-size:11px;color:var(--hint)}
+
+/* TASK */
+.task{background:var(--card);border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px;margin-bottom:5px;display:flex;align-items:flex-start;gap:9px;cursor:pointer;transition:background .1s}
+.task:hover{background:#fafafa}
+.task.done{opacity:.5}
+.task.done .t-title{text-decoration:line-through;color:var(--sub)}
+.chk{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border-d);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.chk.on{background:var(--orange);border-color:var(--orange)}
+.chk.on::after{content:'';display:block;width:5px;height:9px;border:2px solid #fff;border-top:none;border-left:none;transform:rotate(45deg) translate(-1px,-2px)}
+.t-body{flex:1;min-width:0}
+.t-title{font-size:13.5px;line-height:1.45}
+.t-detail{font-size:12px;color:var(--hint);margin-top:3px;line-height:1.5}
+.t-meta{display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap}
+.pdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.ph{background:var(--red)}.pm{background:var(--orange)}.pl{background:var(--green)}
+.dtag{font-size:10px;padding:1px 6px;border-radius:20px;background:var(--orange-l);color:#b35a00;font-weight:500}
+.dtag.daily{background:var(--green-l);color:var(--green-d)}
+.del-btn{padding:3px 6px;font-size:15px;color:var(--hint);cursor:pointer;flex-shrink:0;background:none;border:none;line-height:1}
+.del-btn:hover{color:var(--red)}
+
+/* ADD TASK */
+.add-area{background:var(--card);border:1px dashed var(--border-d);border-radius:var(--rs);margin-bottom:5px;overflow:hidden}
+.add-trigger{width:100%;padding:10px 13px;font-size:13px;color:var(--sub);background:transparent;border:none;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px}
+.add-trigger:hover{background:var(--bg)}
+.add-trigger .plus{font-size:18px;color:var(--orange);font-weight:300;line-height:1}
+.add-form{padding:12px 13px;border-top:1px solid var(--border);display:none}
+.add-form.open{display:block}
+.add-form input,.add-form select,.add-form textarea{width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--border-d);border-radius:var(--rs);background:var(--bg);color:var(--text);margin-bottom:7px;font-family:inherit}
+.add-form textarea{resize:vertical;min-height:52px}
+.fr2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.form-btns{display:flex;gap:7px;margin-top:2px}
+.btn-add{flex:1;padding:8px;background:var(--orange);color:#fff;border:none;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer}
+.btn-add:hover{background:#d97200}
+.btn-cancel{padding:8px 14px;background:transparent;color:var(--sub);border:1px solid var(--border-d);border-radius:var(--rs);font-size:13px;cursor:pointer}
+
+/* FEEDBACK PANEL */
+.fb-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:15px 18px;margin-bottom:12px}
+.fb-title{font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.fb-title .icon{font-size:15px}
+.fb-who{font-size:11px;font-weight:600;color:var(--sub);margin-bottom:5px}
+.fb-textarea{width:100%;font-size:13px;padding:9px 11px;border:1px solid var(--border-d);border-radius:var(--rs);background:var(--bg);color:var(--text);min-height:80px;resize:vertical;font-family:inherit;line-height:1.6}
+.fb-textarea:focus{outline:none;border-color:var(--orange)}
+.fb-textarea[readonly]{background:#fafafa;color:var(--text)}
+.fb-sep{height:1px;background:var(--border);margin:12px 0}
+.fb-save-hint{font-size:11px;color:var(--hint);margin-top:5px}
+
+/* SHARE MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px}
+.overlay.open{display:flex}
+.modal{background:var(--card);border-radius:var(--r);padding:22px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:6px}
+.modal-sub{font-size:13px;color:var(--sub);margin-bottom:16px;line-height:1.6}
+.modal-step{font-size:12px;font-weight:600;color:var(--orange);margin-bottom:4px;margin-top:14px}
+.url-box{width:100%;font-size:11px;padding:9px 10px;border:1px solid var(--border-d);border-radius:var(--rs);background:var(--bg);color:var(--text);resize:none;font-family:monospace;min-height:70px;word-break:break-all}
+.modal-btns{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.mbtn{flex:1;min-width:120px;padding:9px 14px;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;border:none;text-align:center}
+.mbtn-primary{background:var(--orange);color:#fff}
+.mbtn-primary:hover{background:#d97200}
+.mbtn-secondary{background:var(--bg);color:var(--text);border:1px solid var(--border-d)}
+.mbtn-secondary:hover{background:var(--border)}
+
+/* IMPORT MODAL */
+.imp-textarea{width:100%;font-size:12px;padding:9px 10px;border:1px solid var(--border-d);border-radius:var(--rs);background:var(--bg);color:var(--text);resize:vertical;font-family:monospace;min-height:90px;margin-bottom:10px}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a1a1a;color:#fff;font-size:13px;padding:10px 18px;border-radius:20px;z-index:2000;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* EMPTY */
+.empty{text-align:center;padding:28px 16px;color:var(--hint);font-size:13px}
+
+/* FOOTER */
+.foot{text-align:center;font-size:11px;color:var(--hint);padding:20px 16px 0}
+
+@media(max-width:480px){
+  .ov-grid{grid-template-columns:repeat(2,1fr)}
+  .fr2{grid-template-columns:1fr}
+  .hdr-title{font-size:14px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-top">
+    <div>
+      <div class="hdr-title">ぬーまん × Venture Films　コンサル管理</div>
+      <div class="hdr-sub">全6回 / 2026年3〜6月 ｜ 担当：高野慶介</div>
+    </div>
+    <div class="hdr-btns">
+      <button class="hdr-btn import-btn" onclick="openImport()">読み込む</button>
+      <button class="hdr-btn" onclick="openShare()">共有URLを作る</button>
+    </div>
+  </div>
+  <div class="gbar"><div class="gbar-f" id="gbar-f"></div></div>
+</div>
+
+<!-- MODE BANNER -->
+<div class="mode-banner" id="mode-banner">
+  <span id="mode-text"></span>
+  <button onclick="closeBanner()">×</button>
+</div>
+
+<!-- TABS -->
+<div class="tabs" id="tabs"></div>
+
+<!-- CONTENT -->
+<div class="content" id="content"></div>
+
+<div class="foot">データはブラウザに保存されます ｜ nu-man1029 / consul_tool</div>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="overlay" id="share-modal">
+  <div class="modal">
+    <div class="modal-title">共有URLを作る</div>
+    <div class="modal-sub">現在の状態（タスク・フィードバック）をURLに変換します。<br>高野さんにこのURLを送ってください。</div>
+    <div class="modal-step">① 生成されたURL（コピーして高野さんへ送る）</div>
+    <textarea class="url-box" id="share-url-box" readonly></textarea>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-primary" onclick="copyShareUrl()">URLをコピー</button>
+      <button class="mbtn mbtn-secondary" onclick="closeModal('share-modal')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="overlay" id="import-modal">
+  <div class="modal">
+    <div class="modal-title">URLを読み込む</div>
+    <div class="modal-sub">高野さんから受け取ったURLをここに貼り付けてください。<br>フィードバックや更新内容が反映されます。</div>
+    <textarea class="imp-textarea" id="import-url-input" placeholder="https://nu-man1029.github.io/consul_tool/?data=..."></textarea>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-primary" onclick="doImport()">読み込んで反映する</button>
+      <button class="mbtn mbtn-secondary" onclick="closeModal('import-modal')">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const SESSIONS=[
+  {id:1,date:'2026年3月16日（月）',time:'午前9時〜',status:'done',theme:'アルゴリズム基礎・ピン留め戦略・マーケティング設計'},
+  {id:2,date:'2026年4月3日（金）',time:'午前10時〜',status:'active',theme:'感動ストーリー動画の制作 ＋ DaVinci編集 ＋ AI活用'},
+  {id:3,date:'2026年4月中旬（予定）',time:'',status:'future',theme:'未定'},
+  {id:4,date:'2026年5月上旬（予定）',time:'',status:'future',theme:'未定'},
+  {id:5,date:'2026年5月下旬（予定）',time:'',status:'future',theme:'未定'},
+  {id:6,date:'2026年6月中旬（予定）',time:'',status:'future',theme:'未定'},
+];
+
+const DEFAULT_TASKS={
+  1:[
+    {id:'s1_hw1',cat:'宿題（次回必須）',badge:'hw',priority:'high',deadline:'4/3まで',title:'ペルソナ作成（詳細版）',detail:'年齢・職業・年収・悩み・家族構成・趣味・口癖・SNS・ゴールなど全項目を記入。実在する人物レベルで'},
+    {id:'s1_hw2',cat:'宿題（次回必須）',badge:'hw',priority:'high',deadline:'4/3まで',title:'USP（最大の売り）を一文で言語化する',detail:'「ぬーまん工務店は___だから選ばれる」。ペルソナに刺さる理由もセットで整理'},
+    {id:'s1_hw3',cat:'宿題（次回必須）',badge:'hw',priority:'high',deadline:'4/3まで',title:'ストーリー動画の素材を集める',detail:'16歳〜現在の過去写真・作業写真・動画をかき集める。次回の動画制作で使用'},
+    {id:'s1_d1',cat:'毎日やること',badge:'daily',priority:'high',deadline:'毎日',title:'フォロワーへの「いいね」爆押し',detail:'コミュニティガイドライン違反が出るまで約200いいね。デジタル営業活動として毎日継続'},
+    {id:'s1_d2',cat:'毎日やること',badge:'daily',priority:'high',deadline:'毎日',title:'戦略的フォロー（1日20〜50人）',detail:'セメント王子など同ジャンルの投稿に1〜2時間以内にいいねしている人をターゲットにフォロー'},
+    {id:'s1_d3',cat:'毎日やること',badge:'daily',priority:'mid',deadline:'毎日',title:'発見タブのバズ動画をリサーチ',detail:'虫眼鏡タブで同ジャンルのバズ動画の手法・構成をチェックして使えるものを保存'},
+    {id:'s1_u1',cat:'今週中に設定・確認',badge:'urgent',priority:'high',deadline:'今週中',title:'Edits経由の投稿フローを確立する',detail:'DaVinci書き出し→Editsに取り込み→Editsから投稿。このフローをテストして確認'},
+    {id:'s1_u2',cat:'今週中に設定・確認',badge:'urgent',priority:'high',deadline:'今週中',title:'プロダッシュボードで最アクティブ時間を確認',detail:'18時ピークを自分のデータで確認し、投稿曜日・時間の方針を決める'},
+    {id:'s1_u3',cat:'今週中に設定・確認',badge:'urgent',priority:'mid',deadline:'今週中',title:'ピン留め3枠の現状を整理する',detail:'左：感動ストーリー（次回作成）、中：実績動画、右：施工紹介CTA'},
+    {id:'s1_u4',cat:'今週中に設定・確認',badge:'urgent',priority:'mid',deadline:'今週中',title:'CapCutからEditsへ完全移行する',detail:'商用利用問題＆アルゴリズム優遇の観点からEditsへの移行が必須'},
+    {id:'s1_p1',cat:'準備・調査',badge:'prep',priority:'mid',deadline:'4/3まで',title:'同ジャンルアカウントを5件以上リストアップ',detail:'戦略的フォロー施策のターゲット。共同投稿候補にもなる'},
+    {id:'s1_p2',cat:'準備・調査',badge:'prep',priority:'mid',deadline:'4/3まで',title:'ベジタブルチェンジさんの動画を10本以上見る',detail:'構成・話し方・サムネ統一・キレ始まりを研究してノートにまとめる'},
+    {id:'s1_p3',cat:'準備・調査',badge:'prep',priority:'low',deadline:'4/3まで',title:'DJIマイク2の購入を検討',detail:'約1万円。お話系リール動画の音質改善に必須'},
+    {id:'s1_p4',cat:'準備・調査',badge:'prep',priority:'low',deadline:'4/3まで',title:'ノックトランジションを1本試作',detail:'タンタンタンでカット→別の場所で同じポーズでつなぐ。ローラー持ちながら施工シーンと'},
+    {id:'s1_p5',cat:'準備・調査',badge:'prep',priority:'low',deadline:'4/3まで',title:'投稿ストックを最低3本作る',detail:'今日何を上げようか考えている時点でNG。ストックがある状態でルーティーンを作る'},
+  ]
+};
+
+const BADGE_LABEL={hw:'次回必須',daily:'毎日',urgent:'今週中',prep:'準備',other:'タスク'};
+
+let S={tasks:{},done:{},selfNote:{},takanoFB:{},activeTab:'overview'};
+let isReviewMode=false;
+
+function load(){
+  try{const d=localStorage.getItem('nu_consul_v3');if(d)S={...S,...JSON.parse(d)};}catch(e){}
+  for(let i=1;i<=6;i++){
+    if(!S.tasks[i])S.tasks[i]=DEFAULT_TASKS[i]?JSON.parse(JSON.stringify(DEFAULT_TASKS[i])):[];
+    if(!S.done[i])S.done[i]={};
+    if(!S.selfNote[i])S.selfNote[i]='';
+    if(!S.takanoFB[i])S.takanoFB[i]='';
+  }
+}
+
+function save(){
+  try{localStorage.setItem('nu_consul_v3',JSON.stringify(S));}catch(e){}
+}
+
+function stats(sid){
+  const t=S.tasks[sid]||[];
+  const d=t.filter(x=>S.done[sid][x.id]).length;
+  return{total:t.length,done:d,remain:t.length-d,pct:t.length?Math.round(d/t.length*100):0};
+}
+
+function allStats(){
+  let total=0,done=0;
+  for(let i=1;i<=6;i++){const s=stats(i);total+=s.total;done+=s.done;}
+  return{total,done,remain:total-done,pct:total?Math.round(done/total*100):0};
+}
+
+function render(){
+  renderTabs();renderContent();
+  const a=allStats();
+  document.getElementById('gbar-f').style.width=a.pct+'%';
+}
+
+function renderTabs(){
+  const el=document.getElementById('tabs');
+  let h=`<button class="tab${S.activeTab==='overview'?' active':''}" onclick="switchTab('overview')">概要</button>`;
+  for(let i=1;i<=6;i++){
+    const s=stats(i);
+    const a=S.activeTab==='s'+i;
+    h+=`<button class="tab${a?' active':''}" onclick="switchTab('s${i}')">第${i}回<span class="tab-badge">${s.done}/${s.total}</span></button>`;
+  }
+  el.innerHTML=h;
+}
+
+function switchTab(t){S.activeTab=t;save();render();}
+
+function renderContent(){
+  const el=document.getElementById('content');
+  if(S.activeTab==='overview')renderOverview(el);
+  else renderSession(el,parseInt(S.activeTab.replace('s','')));
+}
+
+function renderOverview(el){
+  const a=allStats();
+  let h=`<div class="ov-grid">
+    <div class="ov-card"><div class="ov-num">${a.done}</div><div class="ov-label">完了タスク</div></div>
+    <div class="ov-card"><div class="ov-num">${a.remain}</div><div class="ov-label">残タスク</div></div>
+    <div class="ov-card"><div class="ov-num">${a.pct}%</div><div class="ov-label">全体達成率</div></div>
+  </div><div class="sess-list">`;
+  for(let i=1;i<=6;i++){
+    const sess=SESSIONS[i-1];const s=stats(i);
+    const nc=sess.status==='active'?'s-active':sess.status==='done'?'s-done':'s-future';
+    const sl=sess.status==='done'?'終了':sess.status==='active'?'進行中':'予定';
+    const sc=sess.status==='done'?'st-done':sess.status==='active'?'st-active':'st-future';
+    h+=`<div class="sl-item" onclick="switchTab('s${i}')">
+      <div class="sl-num ${nc}">${i}</div>
+      <div class="sl-body">
+        <div class="sl-title">第${i}回 <span class="status-tag ${sc}">${sl}</span></div>
+        <div class="sl-sub">${sess.date} ${sess.time}</div>
+        <div class="sl-sub">${sess.theme}</div>
+        <div class="sl-bar"><div class="sl-bar-f" style="width:${s.pct}%"></div></div>
+      </div>
+      <div class="sl-pct">${s.pct}%</div>
+    </div>`;
+  }
+  h+='</div>';el.innerHTML=h;
+}
+
+function renderSession(el,sid){
+  const sess=SESSIONS[sid-1];const s=stats(sid);
+  const sl=sess.status==='done'?'終了':sess.status==='active'?'進行中':'予定';
+  const sc=sess.status==='done'?'st-done':sess.status==='active'?'st-active':'st-future';
+  let h=`<div class="sess-hdr">
+    <div class="sess-hdr-title">第${sid}回セッション&nbsp;<span class="status-tag ${sc}">${sl}</span></div>
+    <div class="sess-hdr-meta">
+      <span>${sess.date} ${sess.time}</span>
+      <span style="color:var(--orange)">${sess.theme}</span>
+    </div>
+    <div class="sess-stats">
+      <div><div class="ss-n">${s.done}</div><div class="ss-l">完了</div></div>
+      <div><div class="ss-n" style="color:var(--text)">${s.remain}</div><div class="ss-l">残り</div></div>
+      <div><div class="ss-n">${s.pct}%</div><div class="ss-l">達成率</div></div>
+    </div>
+    <div class="sess-pbar"><div class="sess-pbar-f" style="width:${s.pct}%"></div></div>
+  </div>`;
+
+  const tasks=S.tasks[sid]||[];
+  const cats=[...new Set(tasks.map(t=>t.cat))];
+  if(!tasks.length){h+=`<div class="empty">タスクがありません。下から追加してください。</div>`;}
+  else{
+    cats.forEach(cat=>{
+      const ct=tasks.filter(t=>t.cat===cat);
+      const b=ct[0].badge||'other';
+      const cdone=ct.filter(t=>S.done[sid][t.id]).length;
+      h+=`<div class="section"><div class="sec-head">
+        <span class="sec-name">${cat}</span>
+        <span class="cat-badge cb-${b}">${BADGE_LABEL[b]||b}</span>
+        <span class="sec-count">${cdone}/${ct.length}</span>
+      </div>`;
+      ct.forEach(t=>{
+        const done=!!S.done[sid][t.id];
+        const dc=t.deadline==='毎日'?'daily':'';
+        h+=`<div class="task${done?' done':''}" onclick="toggleTask(${sid},'${t.id}')">
+          <div class="chk${done?' on':''}"></div>
+          <div class="t-body">
+            <div class="t-title">${t.title}</div>
+            ${t.detail?`<div class="t-detail">${t.detail}</div>`:''}
+            <div class="t-meta"><span class="pdot p${t.priority}"></span><span class="dtag ${dc}">${t.deadline}</span></div>
+          </div>
+          <button class="del-btn" onclick="event.stopPropagation();delTask(${sid},'${t.id}')">×</button>
+        </div>`;
+      });
+      h+='</div>';
+    });
+  }
+
+  if(!isReviewMode){
+    h+=`<div class="add-area" id="aa${sid}">
+      <button class="add-trigger" onclick="toggleForm(${sid})"><span class="plus">+</span> タスクを追加</button>
+      <div class="add-form" id="af${sid}">
+        <input type="text" id="at${sid}" placeholder="タスク名（必須）">
+        <textarea id="ad${sid}" placeholder="詳細・メモ（任意）" rows="2"></textarea>
+        <div class="fr2">
+          <input type="text" id="ac${sid}" placeholder="カテゴリ" value="その他">
+          <input type="text" id="adl${sid}" placeholder="期限（例：4/3まで）">
+        </div>
+        <div class="fr2">
+          <select id="ab${sid}"><option value="hw">次回必須</option><option value="daily">毎日</option><option value="urgent">今週中</option><option value="prep">準備</option><option value="other" selected>その他</option></select>
+          <select id="ap${sid}"><option value="high">優先度：高</option><option value="mid" selected>優先度：中</option><option value="low">優先度：低</option></select>
+        </div>
+        <div class="form-btns">
+          <button class="btn-add" onclick="addTask(${sid})">追加する</button>
+          <button class="btn-cancel" onclick="toggleForm(${sid})">キャンセル</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  h+=`<div class="fb-panel">
+    <div class="fb-title"><span class="icon">📝</span> フィードバック・振り返り</div>
+    <div class="fb-who">ぬーまん 自己評価・振り返り</div>
+    <textarea class="fb-textarea" id="sn${sid}" placeholder="このセッションの振り返り、気づき、感想など..."${isReviewMode?' readonly':''}>${S.selfNote[sid]||''}</textarea>
+    ${!isReviewMode?`<div class="fb-save-hint">※ 内容は自動保存されません。下の「保存」ボタンを押してください。</div>`:''}
+    <div class="fb-sep"></div>
+    <div class="fb-who" style="color:var(--orange)">高野さん フィードバック・コメント</div>
+    <textarea class="fb-textarea" id="tf${sid}" placeholder="高野さんへ：ここにフィードバックやコメントをご記入ください..."${!isReviewMode?' readonly':''}>${S.takanoFB[sid]||''}</textarea>
+    ${!isReviewMode?`<div class="fb-save-hint" style="color:var(--orange)">※ 高野さんが共有URLから記入後、読み込むと表示されます。</div>`:''}
+    ${isReviewMode?`<div class="fb-save-hint" style="color:var(--orange)">※ 記入後「共有URLを作る」ボタンでURLを生成してぬーまんに送ってください。</div>`:''}
+    <div style="margin-top:10px">
+      <button class="btn-add" style="max-width:140px" onclick="saveFB(${sid})">保存する</button>
+    </div>
+  </div>`;
+
+  el.innerHTML=h;
+
+  document.getElementById(`sn${sid}`)?.addEventListener('input',e=>{ S.selfNote[sid]=e.target.value; });
+  document.getElementById(`tf${sid}`)?.addEventListener('input',e=>{ S.takanoFB[sid]=e.target.value; });
+}
+
+function toggleTask(sid,tid){S.done[sid][tid]=!S.done[sid][tid];save();render();}
+
+function delTask(sid,tid){
+  if(!confirm('このタスクを削除しますか？'))return;
+  S.tasks[sid]=S.tasks[sid].filter(t=>t.id!==tid);
+  delete S.done[sid][tid];save();render();
+}
+
+function toggleForm(sid){
+  const f=document.getElementById('af'+sid);
+  f.classList.toggle('open');
+  if(f.classList.contains('open'))document.getElementById('at'+sid).focus();
+}
+
+function addTask(sid){
+  const title=document.getElementById('at'+sid).value.trim();
+  if(!title){alert('タスク名を入力してください');return;}
+  S.tasks[sid].push({
+    id:'s'+sid+'_c'+Date.now(),
+    cat:document.getElementById('ac'+sid).value.trim()||'その他',
+    badge:document.getElementById('ab'+sid).value,
+    priority:document.getElementById('ap'+sid).value,
+    deadline:document.getElementById('adl'+sid).value.trim()||'未定',
+    title,detail:document.getElementById('ad'+sid).value.trim()
+  });
+  save();render();
+}
+
+function saveFB(sid){
+  const sn=document.getElementById('sn'+sid);
+  const tf=document.getElementById('tf'+sid);
+  if(sn)S.selfNote[sid]=sn.value;
+  if(tf)S.takanoFB[sid]=tf.value;
+  save();showToast('保存しました');
+}
+
+/* SHARE */
+function stateToB64(){
+  return btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+}
+
+function b64ToState(b64){
+  return JSON.parse(decodeURIComponent(escape(atob(b64))));
+}
+
+function openShare(){
+  const base=location.href.split('?')[0].split('#')[0];
+  const url=base+'?data='+stateToB64();
+  document.getElementById('share-url-box').value=url;
+  document.getElementById('share-modal').classList.add('open');
+}
+
+function copyShareUrl(){
+  const box=document.getElementById('share-url-box');
+  navigator.clipboard.writeText(box.value).then(()=>showToast('URLをコピーしました！')).catch(()=>{
+    box.select();document.execCommand('copy');showToast('URLをコピーしました！');
+  });
+}
+
+function openImport(){
+  document.getElementById('import-url-input').value='';
+  document.getElementById('import-modal').classList.add('open');
+}
+
+function doImport(){
+  const raw=document.getElementById('import-url-input').value.trim();
+  let b64='';
+  try{
+    const u=new URL(raw);b64=u.searchParams.get('data')||'';
+  }catch(e){b64=raw;}
+  if(!b64){showToast('URLが正しくありません');return;}
+  try{
+    const imported=b64ToState(b64);
+    for(let i=1;i<=6;i++){
+      if(imported.takanoFB&&imported.takanoFB[i])S.takanoFB[i]=imported.takanoFB[i];
+      if(imported.selfNote&&imported.selfNote[i])S.selfNote[i]=imported.selfNote[i];
+      if(imported.done&&imported.done[i])Object.assign(S.done[i],imported.done[i]);
+      if(imported.tasks&&imported.tasks[i])S.tasks[i]=imported.tasks[i];
+    }
+    save();closeModal('import-modal');
+    showBanner('merged','高野さんのフィードバックを読み込みました。各セッションのフィードバック欄を確認してください。');
+    render();
+  }catch(e){showToast('読み込みに失敗しました。URLを確認してください');}
+}
+
+/* URL CHECK ON LOAD */
+function checkUrlData(){
+  const params=new URLSearchParams(location.search);
+  const b64=params.get('data');
+  if(!b64)return;
+  try{
+    const imported=b64ToState(b64);
+    S=imported;isReviewMode=true;
+    showBanner('review','高野さんレビューモードです。各セッションのフィードバック欄にコメントを記入し「保存する」後、「共有URLを作る」でURLを生成してぬーまんに送ってください。');
+  }catch(e){}
+}
+
+function showBanner(type,text){
+  const el=document.getElementById('mode-banner');
+  document.getElementById('mode-text').textContent=text;
+  el.className='mode-banner '+type;
+}
+
+function closeBanner(){document.getElementById('mode-banner').className='mode-banner';}
+
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+document.querySelectorAll('.overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+load();checkUrlData();render();
+</script>
+</body>
+</html>
