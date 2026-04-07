@@ -262,6 +262,20 @@ const DEFAULT_TASKS={
     {id:'s1_p3',cat:'準備・調査',badge:'prep',priority:'low',deadline:'4/3まで',title:'DJIマイク2の購入を検討',detail:'約1万円。お話系リール動画の音質改善に必須'},
     {id:'s1_p4',cat:'準備・調査',badge:'prep',priority:'low',deadline:'4/3まで',title:'ノックトランジションを1本試作',detail:'タンタンタンでカット→別の場所で同じポーズでつなぐ。ローラー持ちながら施工シーンと'},
     {id:'s1_p5',cat:'準備・調査',badge:'prep',priority:'low',deadline:'4/3まで',title:'投稿ストックを最低3本作る',detail:'今日何を上げようか考えている時点でNG。ストックがある状態でルーティーンを作る'},
+  ],
+  2:[
+    {id:'s2_hw1',cat:'宿題（次回必須）',badge:'hw',priority:'high',deadline:'次回まで',title:'ペルソナを2つ作成する',detail:'B：20代独立一人親方（技術あり・営業力なし・月収100万目標） / C：インナーガレージ・庭付き戸建て施主（年収800万前後・こだわり層）'},
+    {id:'s2_hw2',cat:'宿題（次回必須）',badge:'hw',priority:'high',deadline:'次回まで',title:'USPを万人受け表現で考える',detail:'業者だけでなく一般人にも一瞬でわかる一文。「ぬーまんといえば___」という形で整理する'},
+    {id:'s2_hw3',cat:'宿題（次回必須）',badge:'hw',priority:'high',deadline:'次回まで',title:'感動ストーリーの8項目を埋める',detail:'導入→物語の始まり→試練→選択→結果→学び→未来→メッセージ　の順で自分の実体験を箇条書きで入力'},
+    {id:'s2_hw4',cat:'宿題（次回必須）',badge:'hw',priority:'high',deadline:'次回まで',title:'ストーリー項目を高野さんにLINEで送る',detail:'Claude版・GPT版でリライトして比較。両方高野さんにも送り、よい方を使う'},
+    {id:'s2_hw5',cat:'宿題（次回必須）',badge:'hw',priority:'mid',deadline:'次回まで',title:'やりたいリール演出リストをLINEで送る',detail:'「開いていくやつ」「文字バック」など具体的に箇条書きでLINEへ送信。次回DaVinciで一緒に実践'},
+    {id:'s2_d1',cat:'毎日やること',badge:'daily',priority:'high',deadline:'毎日',title:'スレッズ：朝・昼・晩の3投稿',detail:'超短文つぶやきでOK。ローラーストーンを専門用語なしで語る。#三重 #松阪などの地域タグを必ず付ける'},
+    {id:'s2_d2',cat:'毎日やること',badge:'daily',priority:'mid',deadline:'毎日',title:'他人ストーリーズのシェア活用',detail:'メンションなしでもシェアできる新機能を積極活用。BNI・地域の投稿をリシェアして露出を増やす'},
+    {id:'s2_u1',cat:'今週中に設定・確認',badge:'urgent',priority:'high',deadline:'今週中',title:'スレッズアカウントを本格稼働させる',detail:'現在706フォロワー。三重地域タグで絞り込み、まず三重エリアに届けることから始める'},
+    {id:'s2_u2',cat:'今週中に設定・確認',badge:'urgent',priority:'mid',deadline:'今週中',title:'さくらサーバーのファイルマネージャーを確認する',detail:'public_htmlフォルダへのアクセス方法を確認。GitHubのproposal-sliderをサーバーに移行する準備'},
+    {id:'s2_p1',cat:'準備・調査',badge:'prep',priority:'mid',deadline:'次回まで',title:'DaVinci Resolve：マジックマスク操作を予習する',detail:'人物を抜く→複製→間にテキストを挟む手順をYouTubeで確認。次回セッションで一緒に実践予定'},
+    {id:'s2_p2',cat:'準備・調査',badge:'prep',priority:'mid',deadline:'次回まで',title:'コンクリート王子との共同投稿企画を検討する',detail:'成果報酬型（成約時パーセンテージ）またはデータ出来高型（いいね単価）で連携案を整理'},
+    {id:'s2_p3',cat:'準備・調査',badge:'prep',priority:'low',deadline:'次回まで',title:'ぬーまんキャラクター設定を考える',detail:'性格・好きなこと・口癖・立ち位置を沼田さん本人とは別キャラとして設定する。強キャラ設定で差別化も検討'},
   ]
 };
 
@@ -273,10 +287,17 @@ let isReviewMode=false;
 function load(){
   try{const d=localStorage.getItem('nu_consul_v3');if(d)S={...S,...JSON.parse(d)};}catch(e){}
   for(let i=1;i<=6;i++){
-    if(!S.tasks[i])S.tasks[i]=DEFAULT_TASKS[i]?JSON.parse(JSON.stringify(DEFAULT_TASKS[i])):[];
+    if(!S.tasks[i])S.tasks[i]=[];
     if(!S.done[i])S.done[i]={};
     if(!S.selfNote[i])S.selfNote[i]='';
     if(!S.takanoFB[i])S.takanoFB[i]='';
+    // デフォルトタスクをマージ（未登録IDのみ追加）
+    if(DEFAULT_TASKS[i]){
+      const existingIds=new Set(S.tasks[i].map(t=>t.id));
+      DEFAULT_TASKS[i].forEach(dt=>{
+        if(!existingIds.has(dt.id))S.tasks[i].push(JSON.parse(JSON.stringify(dt)));
+      });
+    }
   }
 }
 
